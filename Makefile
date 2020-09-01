@@ -42,7 +42,7 @@ endif
 
 # Make these default for now
 $(call force,ARCH,arm)
-PLATFORM        ?= vexpress
+PLATFORM        ?= nuvoton
 # Default value for PLATFORM_FLAVOR is set in plat-$(PLATFORM)/conf.mk
 ifeq ($O,)
 O               := out
