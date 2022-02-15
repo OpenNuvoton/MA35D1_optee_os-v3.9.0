@@ -17,8 +17,6 @@
 #include <io.h>
 #include <tsi_cmd.h>
 
-//#define LOAD_TSI_PATCH
-
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, UART0_BASE, UART0_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, SYS_BASE, SYS_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, TRNG_BASE, TRNG_REG_SIZE);
@@ -26,12 +24,6 @@ register_phys_mem_pgdir(MEM_AREA_IO_SEC, KS_BASE, KS_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, CRYPTO_BASE, CRYPTO_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, TSI_BASE, TSI_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, WHC1_BASE, WHC1_REG_SIZE);
-
-#ifdef LOAD_TSI_PATCH
-static uint8_t _tsi_patch[] = {
-#include "TSI_Patch_secure.dat"
-};
-#endif
 
 static const struct thread_handlers handlers = {
 	.cpu_on = cpu_on_handler,
@@ -43,7 +35,6 @@ static const struct thread_handlers handlers = {
 };
 
 static struct nuvoton_uart_data console_data;
-
 
 const struct thread_handlers *boot_get_handlers(void)
 {
@@ -74,22 +65,14 @@ int ma35d1_tsi_init(void)
 		while (1) {
 			ret = TSI_Get_Version(&version_code);
 			if (ret == ST_SUCCESS) {
-				EMSG("TSI FW version: %x\n", version_code);
+				EMSG("TSI F/W version: %x\n", version_code);
 				break;
 			}
 			if (ret == ST_WAIT_TSI_SYNC) {
-				EMSG("Do TSI_Sync.\n");
+				EMSG("Wait TSI_Sync.\n");
 				TSI_Sync();
 			}
 		}
-
-#ifdef LOAD_TSI_PATCH
-		if (TSI_Load_Image((uint32_t)virt_to_phys(_tsi_patch),
-				   sizeof(_tsi_patch)) == 0)
-			EMSG("Load TSI image successful.\n");
-		else
-			EMSG("Load TSI image failed!!\n");
-#endif
 	}
 	return 0;
 }

@@ -25,7 +25,16 @@
 #define nu_write_reg(reg, val)	io_write32(crypto_base + (reg), (val))
 #define nu_read_reg(reg)	io_read32(crypto_base + (reg))
 
-__aligned(32) static uint32_t  param_block[16];
+__aligned(64) static uint32_t param_block[16];
+__aligned(64) static uint8_t tsi_buff[64];
+
+static inline uint32_t swab32(uint32_t x)
+{
+	return  ((x & (uint32_t)0x000000ffUL) << 24) |
+		((x & (uint32_t)0x0000ff00UL) <<  8) |
+		((x & (uint32_t)0x00ff0000UL) >>  8) |
+		((x & (uint32_t)0xff000000UL) >> 24);
+}
 
 static bool is_timeout(TEE_Time *t_start, uint32_t timeout)
 {
@@ -34,7 +43,7 @@ static bool is_timeout(TEE_Time *t_start, uint32_t timeout)
 
 	tee_time_get_sys_time(&t_now);
 	time_elapsed = (t_now.seconds - t_start->seconds) * 1000 +
-		    (int)t_now.millis - (int)t_start->millis;
+			(int)t_now.millis - (int)t_start->millis;
 
 	if (time_elapsed > timeout)
 		return true;
@@ -116,7 +125,7 @@ static TEE_Result tsi_aes_run(uint32_t types,
 	uint32_t  aes_ctl, aes_ksctl, sid, opmode;
 	int       keysz;
 	bool      is_gcm;
-	int       ret;
+	int       i, ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
@@ -149,21 +158,27 @@ static TEE_Result tsi_aes_run(uint32_t types,
 	cache_operation(TEE_CACHEFLUSH,
 			(void *)((uint64_t)reg_map + AES_IV(0)), 16);
 
-	if (TSI_AES_Set_IV(sid, reg_map_pa + AES_IV(0)) != ST_SUCCESS)
+	ret = TSI_AES_Set_IV(sid, reg_map_pa + AES_IV(0));
+	if (ret != ST_SUCCESS) {
+		EMSG("TSI_AES_Set_IV failed - %d [%d]\n", ret, sid);
 		return TEE_ERROR_CRYPTO_FAIL;
+	}
 
 	cache_operation(TEE_CACHEFLUSH,
 			(void *)((uint64_t)reg_map + AES_KEY(0)), 32);
 
-	if (TSI_AES_Set_Key(sid, keysz, reg_map_pa + AES_KEY(0)) != ST_SUCCESS)
+	ret = TSI_AES_Set_Key(sid, keysz, reg_map_pa + AES_KEY(0));
+	if (ret != ST_SUCCESS) {
+		EMSG("TSI_AES_Set_Key failed %d\n", ret);
 		return TEE_ERROR_CRYPTO_FAIL;
+	}
 
 	/* TSI use FDBCK DMA, force swap here */
 	aes_ctl |= AES_CTL_KINSWAP | AES_CTL_KOUTSWAP;
 
 	ret = TSI_AES_Set_Mode(sid,                           /* sid      */
 			(aes_ctl & AES_CTL_KINSWAP) ? 1 : 0,  /* kinswap  */
-			(aes_ctl & AES_CTL_KOUTSWAP) ? 1 : 0, /* kinswap  */
+			0,                                    /* koutswap */
 			(aes_ctl & AES_CTL_INSWAP) ? 1 : 0,   /* inswap   */
 			(aes_ctl & AES_CTL_OUTSWAP) ? 1 : 0,  /* outswap  */
 			(aes_ctl & AES_CTL_SM4EN) ? 1 : 0,    /* sm4en    */
@@ -215,15 +230,22 @@ static TEE_Result tsi_aes_run(uint32_t types,
 	if (ret != ST_SUCCESS)
 		return TEE_ERROR_CRYPTO_FAIL;
 
-	ret = TSI_Access_Feedback(sid, 1, 4, reg_map_pa + AES_FDBCK(0));
-	EMSG("TSI_Access_Feedback ret = %d\n", ret);
-
 	cache_operation(TEE_CACHEINVALIDATE,
-			(void *)((uint64_t)reg_map + AES_FDBCK(0)), 32);
+			(void *)tsi_buff, sizeof(tsi_buff));
 
-	EMSG("SWAP FDBCK: %08x %08x %08x %08x\n", reg_map[AES_FDBCK(0) / 4],
-	     reg_map[AES_FDBCK(1) / 4], reg_map[AES_FDBCK(2) / 4],
-	     reg_map[AES_FDBCK(3) / 4]);
+	ret = TSI_Access_Feedback(sid, 1, 4, (void *)tsi_buff);
+	if (ret != 0) {
+		EMSG("TSI_Access_Feedback ret = %d\n", ret);
+		return TEE_ERROR_CRYPTO_FAIL;
+	}
+
+	if (aes_ctl & AES_CTL_KOUTSWAP) {
+		uint32_t  *fdbck = (uint32_t *)tsi_buff;
+
+		for (i = 0; i < 4; i++)
+			fdbck[i] = swab32(fdbck[i]);
+	}
+	memcpy(&reg_map[AES_FDBCK(0) / 4], tsi_buff, 16);
 
 	return TEE_SUCCESS;
 }
@@ -315,7 +337,7 @@ static TEE_Result tsi_sha_start(uint32_t types,
 		keylen = params[2].value.a;
 	else
 		keylen = 0;
-EMSG("hmac_ctl = 0x%x\n", hmac_ctl);
+
 	ret = TSI_SHA_Start(params[0].value.a,                  /* sid      */
 			(hmac_ctl & HMAC_CTL_INSWAP) ? 1 : 0,   /* inswap   */
 			(hmac_ctl & HMAC_CTL_OUTSWAP) ? 1 : 0,  /* outswap  */
@@ -367,7 +389,6 @@ static TEE_Result tsi_sha_final(uint32_t types,
 				TEE_Param params[TEE_NUM_PARAMS])
 {
 	uint32_t  *reg_map;
-	uint32_t  reg_map_pa;
 	int       ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
@@ -378,24 +399,20 @@ static TEE_Result tsi_sha_final(uint32_t types,
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 	reg_map = params[1].memref.buffer;
-	reg_map_pa = (uint32_t)virt_to_phys(reg_map);
 
 	cache_operation(TEE_CACHEINVALIDATE,
-			(void *)((uint64_t)reg_map + HMAC_DGST(0)),
-			0x100);
-	cache_operation(TEE_CACHEFLUSH,
-			(void *)((uint64_t)reg_map[HMAC_SADDR / 4]),
-			reg_map[HMAC_DMACNT / 4]);
+			(void *)tsi_buff, sizeof(tsi_buff));
 
 	ret = TSI_SHA_Finish(params[0].value.a,      /* sid       */
 			params[0].value.b / 4,       /* wcnt      */
 			reg_map[HMAC_DMACNT / 4],    /* data_cnt  */
 			reg_map[HMAC_SADDR / 4],     /* src_addr  */
-			reg_map_pa + HMAC_DGST(0)    /* dest_addr */
+			(uint32_t)tsi_buff           /* dest_addr */
 			);
 	if (ret != ST_SUCCESS)
 		return TEE_ERROR_CRYPTO_FAIL;
 
+	memcpy(&reg_map[HMAC_DGST(0) / 4], tsi_buff,  64);
 	return TEE_SUCCESS;
 }
 
