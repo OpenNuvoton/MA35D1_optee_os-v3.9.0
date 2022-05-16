@@ -96,7 +96,7 @@ static TEE_Result ma35d1_ks_init(void)
 	vaddr_t tsi_base = core_mmu_get_va(TSI_BASE, MEM_AREA_IO_SEC);
 	TEE_Time  t_start;
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN)
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN))
 		return ma35d1_tsi_init();
 
 	if ((io_read32(tsi_base + 0x210) & 0x7) != 0x2) {
@@ -178,7 +178,7 @@ static TEE_Result ma35d1_ks_read(uint32_t types,
 
 	cache_operation(TEE_CACHEINVALIDATE, key_buff, remain_cnt * 4);
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN) {
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		ret = TSI_KS_Read(params[0].value.a,        /* eType      */
 			params[0].value.b,                  /* i32KeyIdx  */
 			(uint32_t *)virt_to_phys(key_buff), /* au32Key    */
@@ -277,7 +277,7 @@ static TEE_Result ma35d1_ks_write(uint32_t types,
 
 	metadata = (params[0].value.a << KS_META_DST_POS) | params[0].value.b;
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN) {
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		cache_operation(TEE_CACHEFLUSH, key_buff, buff_remain * 4);
 		if (params[0].value.a == KS_OTP)
 			ret = TSI_KS_Write_OTP(KS_TOKEYIDX(params[0].value.b),
@@ -388,7 +388,7 @@ static TEE_Result ma35d1_ks_erase(uint32_t types,
 		}
 	}
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN) {
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		ret = TSI_KS_EraseKey(params[0].value.a, params[0].value.b);
 		if (ret != ST_SUCCESS) {
 			EMSG("TSI_KS_EraseKey fail! 0x%x\n", ret);
@@ -435,7 +435,7 @@ static TEE_Result ma35d1_ks_erase_all(void)
 	TEE_Time  t_start;
 	int       ret;
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN) {
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		ret = TSI_KS_EraseAll();
 		if (ret != ST_SUCCESS) {
 			EMSG("TSI_KS_EraseAll fail! 0x%x\n", ret);
@@ -501,7 +501,7 @@ static TEE_Result ma35d1_ks_revoke(uint32_t types,
 		}
 	}
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN) {
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		ret = TSI_KS_RevokeKey(params[0].value.a, params[0].value.b);
 		if (ret != ST_SUCCESS) {
 			EMSG("TSI_KS_RevokeKey fail! 0x%x\n", ret);
@@ -557,7 +557,7 @@ static TEE_Result ma35d1_ks_remain(uint32_t types,
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN) {
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		ret = TSI_KS_GetRemainSize(&params[0].value.a);
 		if (ret != ST_SUCCESS) {
 			EMSG("TSI_KS_GetRemainSize fail! 0x%x\n", ret);

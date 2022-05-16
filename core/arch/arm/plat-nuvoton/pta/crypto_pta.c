@@ -55,7 +55,7 @@ static TEE_Result ma35d1_crypto_init(void)
 	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t tsi_base = core_mmu_get_va(TSI_BASE, MEM_AREA_IO_SEC);
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN)
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN))
 		return ma35d1_tsi_init();
 
 	if ((io_read32(tsi_base + 0x210) & 0x7) != 0x2) {
@@ -774,7 +774,7 @@ static TEE_Result invoke_command(void *pSessionContext __unused,
 
 	FMSG("command entry point for pseudo-TA \"%s\"", PTA_NAME);
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN)
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN))
 		tsi_en = 1;
 	else
 		tsi_en = 0;

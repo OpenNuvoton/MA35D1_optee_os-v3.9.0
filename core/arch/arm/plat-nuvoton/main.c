@@ -52,7 +52,7 @@ int ma35d1_tsi_init(void)
 	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	int  ret;
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN) {
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		/*
 		 * TSI enabled. Invoke TSI command and return here.
 		 */
@@ -61,6 +61,10 @@ int ma35d1_tsi_init(void)
 		/* enable WHC1 clock */
 		io_write32(sys_base + 0x208,
 			   io_read32(sys_base + 0x208) | (1 << 5));
+
+		ret = TSI_Get_Version(&version_code);
+		if (ret == ST_SUCCESS)
+			return 0;   /* TSI is ready. */
 
 		while (1) {
 			ret = TSI_Get_Version(&version_code);

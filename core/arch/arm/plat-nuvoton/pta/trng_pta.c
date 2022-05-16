@@ -201,10 +201,23 @@ static int ma35d1_trng_create_state(vaddr_t trng_base)
 static TEE_Result ma35d1_trng_init(uint32_t types,
 				    TEE_Param params[TEE_NUM_PARAMS])
 {
-	uint32_t nonce[16] =  { 0xaf5781ca, 0xc5b733e2, 0x98cb7a6f, 0xb095a073,
-				0x4562a67f, 0x5443ca1a, 0x845a2c0b, 0x74223a2b,
-				0x398ce2a7, 0x93c5b66a, 0x56567ac1, 0xcb3eaa16,
-				0xda47f33b, 0x456a2e5b, 0xc44d56ae, 0x778d3c1a };
+	uint32_t nonce[64] = { 0xc47b0294, 0xdbbbee0f, 0xec4757f2, 0x2ffeee35,
+			       0x87ca4730, 0xc3d33b69, 0x1df38bab, 0x63ac0a6b,
+			       0xd38da3ab, 0x584a50ea, 0xb93f2603, 0x09a5c691,
+			       0x09a5c691, 0x024f91ac, 0x6063ce20, 0x229160d9,
+			       0x49e00388, 0x1ab6b0cd, 0xe657cb40, 0x87c5aa81,
+			       0xd611eab8, 0xa7ae6d1c, 0x3a181a28, 0x9391bbec,
+			       0x22186179, 0xb6476813, 0x67e64213, 0x47cc0c01,
+			       0xf53bc314, 0x73545902, 0xd8a14864, 0xb31262d1,
+			       0x2bf77bc3, 0xd81c9e3a, 0xa0657c50, 0x51a2fe50,
+			       0x91ff8818, 0x6de4dc00, 0xba468631, 0x7601971c,
+			       0xdec69b2f, 0x336e9662, 0xef73d94a, 0x618226a3,
+			       0x3cdd3154, 0xf361b408, 0x55d394b4, 0xfc3d7775,
+			       0x8b35e0ef, 0xa221fe17, 0x0d498127, 0x641719f1,
+			       0x4e5197b1, 0x7c84d929, 0xab60aa80, 0x08889570,
+			       0xee42614d, 0x73c2ace4, 0xbaed0e9c, 0x9a12145d,
+			       0xed66a951, 0xeac1e50f, 0x690c563b, 0x5dccdc9d
+			       };
 	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t trng_base = core_mmu_get_va(TRNG_BASE, MEM_AREA_IO_SEC);
 	vaddr_t tsi_base = core_mmu_get_va(TSI_BASE, MEM_AREA_IO_SEC);
@@ -218,22 +231,21 @@ static TEE_Result ma35d1_trng_init(uint32_t types,
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	if (io_read32(sys_base + SYS_CHIPCFG) & TSIEN) {
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 
 		ret = ma35d1_tsi_init();
 		if (ret != 0)
 			return ret;
 
-		ret = TSI_TRNG_Init(1, (uint32_t)((uint64_t)nonce));
+		ret = TSI_TRNG_Init(0, 0); //(uint32_t)((uint64_t)nonce));
 		if (ret == ST_WAIT_TSI_SYNC) {
 			if (TSI_Sync() != ST_SUCCESS)
 				return TEE_ERROR_TRNG_BUSY;
-			ret = TSI_TRNG_Init(1, (uint32_t)((uint64_t)nonce));
+			ret = TSI_TRNG_Init(0, 0); // (uint32_t)((uint64_t)nonce));
 		}
 		if (ret != ST_SUCCESS)
 			return TEE_ERROR_TRNG_GEN_NOISE;
 
-		FMSG("TSI_TRNG init done.\n");
 		return TEE_SUCCESS;
 	}
 
@@ -312,7 +324,7 @@ static TEE_Result ma35d1_trng_read(uint32_t types,
 	if (!rdata)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		/*
 		 * TSI enabled. Invoke TSI command and return here.
 		 */
