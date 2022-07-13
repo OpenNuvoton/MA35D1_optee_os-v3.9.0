@@ -95,7 +95,7 @@ static int tsi_send_command(TSI_REQ_T *req)
 		return ST_WHC_TX_BUSY;
 	}
 	
-	//EMSG("TSI CMD: 0x%x 0x%x 0x%x 0x%x\n", req->cmd[0], req->cmd[1],
+	// EMSG("TSI CMD: 0x%x 0x%x 0x%x 0x%x\n", req->cmd[0], req->cmd[1],
 	//     req->cmd[2], req->cmd[3]);
 
 	nu_write_reg(TMDAT(i, 0), req->cmd[0]);
@@ -124,7 +124,7 @@ static int tsi_wait_ack(TSI_REQ_T *req, int time_out)
 				req->ack[3] = nu_read_reg(RMDAT(i, 3));
 				nu_write_reg(RXCTL, (1 << i)); /* set CHxACK */
 
-				//EMSG("ACK: 0x%x 0x%x 0x%x 0x%x\n",
+				// EMSG("\n\nACK: 0x%x 0x%x 0x%x 0x%x\n\n",
 				// req->ack[0], req->ack[1], req->ack[2],
 				// req->ack[3]);
 				return 0;
@@ -946,7 +946,7 @@ int TSI_RSA_Exp_Mod(int rsa_len, int crt, int esel, int e_knum,
 	TSI_REQ_T  req;
 
 	memset(&req, 0, sizeof(req));
-	req.cmd[0] = (CMD_RSA_EXP_MOD << 16) | rsa_len;
+	req.cmd[0] = (CMD_EXT_RSA_EXP_MOD << 16) | rsa_len;
 	req.cmd[1] = (crt << 10) | (esel << 8) | e_knum;
 	req.cmd[2] = param_addr;
 	req.cmd[3] = dest_addr;

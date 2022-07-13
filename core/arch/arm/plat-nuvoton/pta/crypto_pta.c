@@ -36,6 +36,19 @@ static inline uint32_t swab32(uint32_t x)
 		((x & (uint32_t)0xff000000UL) >> 24);
 }
 
+static void dump_buff(char *str, uint8_t *buff, int len)
+{
+	int i;
+
+	EMSG("%s\n", str);
+	for (i = 0; i < len; i+= 16) {
+		EMSG("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			buff[i], buff[i+1], buff[i+2], buff[i+3], buff[i+4], buff[i+5], buff[i+6], buff[i+7],
+			buff[i+8], buff[i+9], buff[i+10], buff[i+11], buff[i+12], buff[i+13], buff[i+14],
+			buff[i+15]);
+	}
+}
+
 static bool is_timeout(TEE_Time *t_start, uint32_t timeout)
 {
 	TEE_Time  t_now;
@@ -235,7 +248,7 @@ static TEE_Result tsi_aes_run(uint32_t types,
 
 	ret = TSI_Access_Feedback(sid, 1, 4, (void *)tsi_buff);
 	if (ret != 0) {
-		EMSG("TSI_Access_Feedback ret = %d\n", ret);
+		EMSG("TSI_Access_Feedback failed ret = %d\n", ret);
 		return TEE_ERROR_CRYPTO_FAIL;
 	}
 
@@ -522,26 +535,31 @@ static TEE_Result tsi_ecc_pmul(uint32_t types,
 	ecc_ksxy = reg_map[ECC_KSXY / 4];
 		reg_map_pa = (uint32_t)virt_to_phys(reg_map);
 
-	rssrc = (ecc_ksctl & ECC_KSCTL_RSSRCK_MASK) >> ECC_KSCTL_RSSRCK_OFFSET;
-	if (rssrc == 0)
-		msel = 2;
-	else if (rssrc == 2)
-		msel = 1;
-	else
-		msel = 3;
+	if (ecc_ksctl & ECC_KSCTL_RSRCK) {
+		rssrc = (ecc_ksctl & ECC_KSCTL_RSSRCK_MASK) >> ECC_KSCTL_RSSRCK_OFFSET;
+		if (rssrc == 0)
+			msel = 2; /* Key is from KS SRAM */
+		else
+			msel = 1; /* Key is from KS OTP */
+	} else {
+		msel = 3; /* Key is from parameter block */
+	}
 
-	sps = (ecc_ksxy & ECC_KSXY_RSSRCX_MASK) >> ECC_KSXY_RSSRCX_OFFSET;
-	if (sps == 0)
-		sps = 2;
-	else if (rssrc == 2)
-		sps = 1;
-	else
-		sps = 3;
+	if (ecc_ksxy & ECC_KSXY_RSRCXY) {
+		sps = (ecc_ksxy & ECC_KSXY_RSSRCX_MASK) >> ECC_KSXY_RSSRCX_OFFSET;
+		if (sps == 0)
+			sps = 2; /* XY key from KS SRAM */
+		else 
+			sps = 1; /* XY key from KS OTP */
+	} else {
+		sps = 3; /* XY key from parameter block */
+	}
 
 	cache_operation(TEE_CACHEFLUSH, (void *)((uint64_t)reg_map +
-				params[2].value.a), 1728);
+				params[2].value.a), 576 * 3);
+
 	cache_operation(TEE_CACHEINVALIDATE, (void *)((uint64_t)reg_map +
-				params[2].value.a), 1152);
+				params[2].value.b), 576 * 2);
 
 	ret = TSI_ECC_Multiply(params[0].value.a,             /* curve_id   */
 			(ecc_ksctl & ECC_KSCTL_ECDH) ? 1 : 0, /* type       */
@@ -559,10 +577,11 @@ static TEE_Result tsi_ecc_pmul(uint32_t types,
 	if (ret != ST_SUCCESS)
 		return TEE_ERROR_CRYPTO_FAIL;
 
-	Hex2Reg((char *)((uint64_t)params[0].value.b),
-		(uint32_t *)((uint64_t)reg_map + ECC_X1(0)));
-	Hex2Reg((char *)((uint64_t)params[0].value.b + 0x240),
-		(uint32_t *)((uint64_t)reg_map + ECC_X1(0)));
+	Hex2Reg((char *)&reg_map[params[2].value.b / 4],
+		(uint32_t *)&reg_map[ECC_X1(0) / 4]);
+
+	Hex2Reg((char *)&reg_map[(params[2].value.b + 0x240) / 4],
+		(uint32_t *)&reg_map[ECC_Y1(0) / 4]);
 
 	return TEE_SUCCESS;
 }
@@ -665,31 +684,20 @@ static TEE_Result tsi_rsa_run(uint32_t types,
 		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
-
 	reg_map = params[1].memref.buffer;
 	reg_map_pa = (uint32_t)virt_to_phys(reg_map);
 
 	rsa_ctl = reg_map[RSA_CTL / 4];
 	rsa_ksctl = reg_map[RSA_KSCTL / 4];
 
-	memcpy((uint8_t *)&reg_map[0x1000 / 4],
-	       (uint8_t *)((uint64_t)reg_map[RSA_SADDR0 / 4]), 0x200);
-	memcpy((uint8_t *)&reg_map[0x1200 / 4],
-	       (uint8_t *)((uint64_t)reg_map[RSA_SADDR1 / 4]), 0x200);
-	memcpy((uint8_t *)&reg_map[0x1400 / 4],
-	       (uint8_t *)((uint64_t)reg_map[RSA_SADDR2 / 4]), 0x200);
-	memcpy((uint8_t *)&reg_map[0x1600 / 4],
-	       (uint8_t *)((uint64_t)reg_map[RSA_SADDR3 / 4]), 0x200);
-	memcpy((uint8_t *)&reg_map[0x1800 / 4],
-	       (uint8_t *)((uint64_t)reg_map[RSA_SADDR4 / 4]), 0x200);
-
-	reg_map[0x2800 / 4] = reg_map[RSA_KSSTS0 / 4];
-	reg_map[0x2804 / 4] = reg_map[RSA_KSSTS1 / 4];
+	reg_map[1536] = reg_map[RSA_KSSTS0 / 4];
+	reg_map[1537] = reg_map[RSA_KSSTS1 / 4];
+	reg_map[1538] = reg_map[RSA_KSCTL / 4];
 
 	cache_operation(TEE_CACHEFLUSH,
-			(void *)((uint64_t)reg_map + 0x1000), 1728);
+			(void *)(&reg_map[0x1000 / 4]), 0x2000);
 	cache_operation(TEE_CACHEINVALIDATE,
-			(void *)((uint64_t)reg_map + 0x3000), 1152);
+			(void *)(&reg_map[0x3000 / 4]), 0x1000);
 
 	ret = TSI_RSA_Exp_Mod((rsa_ctl & RSA_CTL_KEYLENG_MASK) >>
 			RSA_CTL_KEYLENG_OFFSET,         /* rsa_len    */
@@ -700,13 +708,10 @@ static TEE_Result tsi_rsa_run(uint32_t types,
 		reg_map_pa + 0x1000,                    /* param_addr */
 		reg_map_pa + 0x3000                     /* dest_addr  */
 		);
-
-	if (ret != ST_SUCCESS)
+	if (ret != ST_SUCCESS) {
+		EMSG("TSI_RSA_Exp_Mod error return: 0x%x\n", ret);
 		return TEE_ERROR_CRYPTO_FAIL;
-
-	memcpy((uint8_t *)((uint64_t)reg_map[RSA_DADDR / 4]),
-	       (uint8_t *)&reg_map[0x3000 / 4], 0x200);
-
+	}
 	return TEE_SUCCESS;
 }
 

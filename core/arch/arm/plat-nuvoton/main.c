@@ -17,6 +17,8 @@
 #include <io.h>
 #include <tsi_cmd.h>
 
+#define LOAD_TSI_PATCH
+
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, UART0_BASE, UART0_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, SYS_BASE, SYS_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, TRNG_BASE, TRNG_REG_SIZE);
@@ -24,6 +26,10 @@ register_phys_mem_pgdir(MEM_AREA_IO_SEC, KS_BASE, KS_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, CRYPTO_BASE, CRYPTO_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, TSI_BASE, TSI_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, WHC1_BASE, WHC1_REG_SIZE);
+
+#ifdef LOAD_TSI_PATCH
+#include "tsi_patch.c"
+#endif
 
 static const struct thread_handlers handlers = {
 	.cpu_on = cpu_on_handler,
@@ -78,5 +84,14 @@ int ma35d1_tsi_init(void)
 			}
 		}
 	}
+
+#ifdef LOAD_TSI_PATCH
+	ret = TSI_Load_Image((uint32_t)virt_to_phys(tsi_patch_image),
+				   	sizeof(tsi_patch_image));
+	if (ret == 0)
+		EMSG("Load TSI image successful.\n");
+	else
+		EMSG("Load TSI image failed!! %d\n", ret);
+#endif
 	return 0;
 }

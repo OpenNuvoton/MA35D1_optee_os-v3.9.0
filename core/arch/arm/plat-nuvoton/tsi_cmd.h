@@ -54,6 +54,7 @@
 #define CMD_ECC_VERIFY_SIG      0x0603
 #define CMD_ECC_MULTIPLY        0x0604
 #define CMD_RSA_EXP_MOD         0x0702
+#define	CMD_EXT_RSA_EXP_MOD     0xFE51
 #define CMD_KS_WRITE_SRAM_KEY   0x0A01
 #define CMD_KS_WRITE_OTP_KEY    0x0A02
 #define CMD_KS_READ_KEY         0x0A05
@@ -141,10 +142,10 @@ enum {
 
 #define TSI_CMD_WORD0(cc, sc, sid)	(((cc) << 24) | ((sc) << 16) | (sid))
 
-#define CMD_TIME_OUT_1S             100     /* general time-out 1 seconds */
-#define CMD_TIME_OUT_2S             200     /* general time-out 2 seconds */
-#define CMD_TIME_OUT_3S             300     /* general time-out 3 seconds */
-#define CMD_TIME_OUT_5S             500     /* general time-out 5 seconds */
+#define CMD_TIME_OUT_1S             1000     /* general time-out 1 seconds */
+#define CMD_TIME_OUT_2S             2000     /* general time-out 2 seconds */
+#define CMD_TIME_OUT_3S             3000     /* general time-out 3 seconds */
+#define CMD_TIME_OUT_5S             5000     /* general time-out 5 seconds */
 
 #define SEL_KEY_FROM_REG            0x0
 #define SEL_KEY_FROM_KS_SRAM        0x1
