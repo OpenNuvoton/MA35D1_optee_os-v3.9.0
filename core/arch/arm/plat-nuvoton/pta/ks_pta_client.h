@@ -11,6 +11,8 @@
 #define TEE_ERROR_KS_BUSY		0x00000001
 #define TEE_ERROR_KS_FAIL		0x00000002
 #define TEE_ERROR_KS_INVALID		0x00000003
+#define TEE_ERROR_OTP_INVALID		0x00000011
+#define TEE_ERROR_OTP_FAIL		0x00000012
 
 /*
  * PTA_CMD_KS_INIT - Initialize Key Store
@@ -120,5 +122,21 @@
  * TEE_ERROR_KS_FAIL - Get remain operation failed
  */
 #define PTA_CMD_KS_REMAIN		0x7
+
+/*
+ * PTA_CMD_OTP_READ - Read OTP
+ *
+ * param[0] (in value) - value.a: OTP address
+ * param[1] (inout memref) - memref.size: word count of OTP key
+ *                           memref.buffer: key buffer
+ * param[2] unused
+ * param[3] unused
+ *
+ * Result:
+ * TEE_SUCCESS - Invoke command success
+ * TEE_ERROR_OTP_INVALID - Incorrect input param
+ * TEE_ERROR_OTP_FAIL - read OTP failed
+ */
+#define PTA_CMD_OTP_READ		0x12
 
 #endif /* __KS_PTA_CLIENT_H */

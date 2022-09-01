@@ -54,7 +54,6 @@
 #define CMD_ECC_VERIFY_SIG      0x0603
 #define CMD_ECC_MULTIPLY        0x0604
 #define CMD_RSA_EXP_MOD         0x0702
-#define	CMD_EXT_RSA_EXP_MOD     0xFE51
 #define CMD_KS_WRITE_SRAM_KEY   0x0A01
 #define CMD_KS_WRITE_OTP_KEY    0x0A02
 #define CMD_KS_READ_KEY         0x0A05
@@ -64,13 +63,8 @@
 #define CMD_KS_REMAIN_SIZE      0x0A15
 #define CMD_KS_GET_STATUS       0x0A20
 
-#define CMD_EX_GET_VERSION      0xFE02
-#define	CMD_EX_AES_SET_MODE     0xFE10
-#define	CMD_EX_AES_SET_IV       0xFE11
-#define	CMD_EX_AES_SET_KEY      0xFE12
-#define	CMD_EX_AES_RUN          0xFE13
-#define CMD_EX_AES_GCM_RUN      0xFE15
-#define CMD_EX_AES_ACCESS_FDBCK 0xFE17
+#define CMD_EXT_OTP_READ        0xF910
+#define	CMD_EXT_RSA_EXP_MOD     0xFE51
 
 /*------------------------------------------------------------------*/
 /*  TSI command ACK status                                          */
@@ -249,5 +243,6 @@ int  TSI_KS_EraseAll(void);
 int  TSI_KS_GetRemainSize(uint32_t *remain_size);
 int  TSI_KS_GetStatus(uint32_t *ks_sts, uint32_t *ks_otpsts,
 		      uint32_t *ks_metadata);
+int  TSI_OTP_Read(uint32_t u32Addr, uint32_t *u32Data);
 
 #endif	/* __TSI_CMD_H__ */

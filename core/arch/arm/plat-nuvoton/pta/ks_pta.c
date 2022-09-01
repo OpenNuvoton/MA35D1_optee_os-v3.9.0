@@ -22,6 +22,32 @@
 #define KS_BUSY_TIMEOUT		2000
 
 /*----------------------------------------------------------------------*/
+/*  MA35D1 OTP registers                                                */
+/*----------------------------------------------------------------------*/
+#define OTP_CTL			(otp_base + 0x00)
+#define OTP_CTL_START			(0x1 << 0)
+#define OTP_STS			(otp_base + 0x04)
+#define OTP_STS_BUSY			(0x1 << 0)
+#define OTP_STS_PFF			(0x1 << 1)
+#define OTP_STS_ADDRFF			(0x1 << 2)
+#define OTP_STS_FTMFF			(0x1 << 3)
+#define OTP_STS_CMDFF			(0x1 << 4)
+#define OTP_STS_TFF			(0x1 << 7)
+#define OTP_ADDR		(otp_base + 0x08)
+#define OTP_DATA		(otp_base + 0x0C)
+#define OTP_USMSTS0		(otp_base + 0x10)
+#define OTP_USMSTS1		(otp_base + 0x14)
+
+#define OTP_CMD_READ		(0x0 << 4)
+#define OTP_CMD_PROGRAM		(0x1 << 4)
+#define OTP_CMD_READ_ONLY	(0x2 << 4)
+#define OTP_CMD_FTM		(0x3 << 4)
+#define OTP_CMD_READ_CHKER	(0x7 << 4)
+#define OTP_CMD_READ_CID	(0xB << 4)
+#define OTP_CMD_READ_DID	(0xC << 4)
+#define OTP_CMD_READ_UID	(0xD << 4)
+
+/*----------------------------------------------------------------------*/
 /*  MA35D1 Key Store registers                                         */
 /*----------------------------------------------------------------------*/
 #define KS_CTL			(ks_base + 0x00)
@@ -157,7 +183,6 @@ static TEE_Result ma35d1_ks_read(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -185,7 +210,7 @@ static TEE_Result ma35d1_ks_read(uint32_t types,
 			remain_cnt                          /* u32WordCnt */
 			);
 		if (ret != ST_SUCCESS) {
-			EMSG("TSI_KS_Read fail! 0x%x\n", ret);
+			// EMSG("TSI_KS_Read key %d failed! 0x%x\n", params[0].value.b, ret);
 			return TEE_ERROR_KS_FAIL;
 		}
 		return TEE_SUCCESS;
@@ -260,7 +285,6 @@ static TEE_Result ma35d1_ks_write(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_VALUE_OUTPUT,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -372,7 +396,6 @@ static TEE_Result ma35d1_ks_erase(uint32_t types,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -485,7 +508,6 @@ static TEE_Result ma35d1_ks_revoke(uint32_t types,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -553,7 +575,6 @@ static TEE_Result ma35d1_ks_remain(uint32_t types,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -577,6 +598,67 @@ static TEE_Result ma35d1_ks_remain(uint32_t types,
 	reg_data = io_read32(KS_REMAIN);
 	params[0].value.a = (reg_data & KS_REMAIN_RRMNG_MSK) >>
 			     KS_REMAIN_RRMNG_POS;
+	return TEE_SUCCESS;
+}
+
+static TEE_Result ma35d1_otp_read(uint32_t types,
+				  TEE_Param params[TEE_NUM_PARAMS])
+{
+	vaddr_t   sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+	vaddr_t   otp_base = core_mmu_get_va(OTP_BASE, MEM_AREA_IO_SEC);
+	uint32_t  otp_addr, wcnt, i;
+	uint32_t  *key_buff;
+	TEE_Time  t_start;
+	int       ret;
+
+	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
+				     TEE_PARAM_TYPE_MEMREF_INOUT,
+				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE)) {
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+
+	otp_addr = params[0].value.a;
+	wcnt = params[1].memref.size;
+	key_buff = params[1].memref.buffer;
+
+	if ((otp_addr < 0x100) || (otp_addr + wcnt * 4 > 0x1D0)) {
+		EMSG("OTP read over range: 0x%x + 0x%x\n", otp_addr, wcnt);
+		return TEE_ERROR_OTP_INVALID;
+	}
+
+	cache_operation(TEE_CACHEINVALIDATE, key_buff, wcnt * 4);
+
+	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
+		for (i = 0; i < wcnt; i ++) {
+			ret = TSI_OTP_Read(otp_addr + i * 4, &key_buff[i]);
+			if (ret != ST_SUCCESS) {
+				EMSG("TSI_OTP_Read fail! 0x%x\n", ret);
+				return TEE_ERROR_OTP_FAIL;
+			}
+		}
+		return TEE_SUCCESS;
+	}
+
+	for (i = 0; i < wcnt; i++) {
+		io_write32(OTP_ADDR, otp_addr + i * 4);
+		io_write32(OTP_CTL, OTP_CMD_READ | OTP_CTL_START);
+
+		/* Waiting for OTP processing */
+		tee_time_get_sys_time(&t_start);
+		while (io_read32(OTP_STS) & OTP_STS_BUSY) {
+			if (is_timeout(&t_start, 500) == true)
+				return TEE_ERROR_OTP_FAIL;
+		}
+
+		if (io_read32(OTP_STS) & (OTP_STS_ADDRFF | OTP_STS_CMDFF)) {
+			EMSG("OTP read failed, status = 0x%x\n",
+				io_read32(OTP_STS));
+			io_write32(OTP_STS, (OTP_STS_ADDRFF | OTP_STS_CMDFF));
+			return TEE_ERROR_OTP_FAIL;
+		}
+		key_buff[i] = io_read32(OTP_DATA);
+	}
 	return TEE_SUCCESS;
 }
 
@@ -607,6 +689,9 @@ static TEE_Result invoke_command(void *pSessionContext __unused,
 
 	case PTA_CMD_KS_REMAIN:
 		return ma35d1_ks_remain(nParamTypes, pParams);
+
+	case PTA_CMD_OTP_READ:
+		return ma35d1_otp_read(nParamTypes, pParams);
 
 	default:
 		break;

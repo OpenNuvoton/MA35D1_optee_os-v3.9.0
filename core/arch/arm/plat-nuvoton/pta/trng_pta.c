@@ -227,7 +227,6 @@ static TEE_Result ma35d1_trng_init(uint32_t types,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -311,7 +310,6 @@ static TEE_Result ma35d1_trng_read(uint32_t types,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 

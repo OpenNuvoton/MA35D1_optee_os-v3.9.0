@@ -30,6 +30,9 @@
 #define KS_BASE			0x40340000UL
 #define KS_REG_SIZE		0x1000
 
+#define OTP_BASE		0x40350000UL
+#define OTP_REG_SIZE		0x1000
+
 #define TSI_BASE		0x40360000UL
 #define TSI_REG_SIZE		0x1000
 

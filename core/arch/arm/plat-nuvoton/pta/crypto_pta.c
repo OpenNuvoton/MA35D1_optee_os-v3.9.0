@@ -103,7 +103,6 @@ static TEE_Result tsi_open_session(uint32_t types,
 				     TEE_PARAM_TYPE_VALUE_OUTPUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 	if (TSI_Open_Session(params[0].value.a, &sid) != ST_SUCCESS)
@@ -120,7 +119,6 @@ static TEE_Result tsi_close_session(uint32_t types,
 				     TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 	if (TSI_Close_Session(params[0].value.a,
@@ -144,7 +142,6 @@ static TEE_Result tsi_aes_run(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -275,7 +272,6 @@ static TEE_Result ma35d1_aes_run(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -340,7 +336,6 @@ static TEE_Result tsi_sha_start(uint32_t types,
 				     TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -379,7 +374,6 @@ static TEE_Result tsi_sha_update(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 	reg_map = params[1].memref.buffer;
@@ -408,7 +402,6 @@ static TEE_Result tsi_sha_final(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 	reg_map = params[1].memref.buffer;
@@ -441,7 +434,6 @@ static TEE_Result ma35d1_sha_update(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -524,7 +516,6 @@ static TEE_Result tsi_ecc_pmul(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -598,7 +589,6 @@ static TEE_Result ma35d1_ecc_pmul(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
@@ -681,7 +671,6 @@ static TEE_Result tsi_rsa_run(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 	reg_map = params[1].memref.buffer;
@@ -726,7 +715,6 @@ static TEE_Result ma35d1_rsa_run(uint32_t types,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE)) {
-		EMSG("bad parameters types: 0x%" PRIx32, types);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 

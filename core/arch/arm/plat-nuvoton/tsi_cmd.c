@@ -1178,3 +1178,23 @@ int  TSI_KS_GetStatus(uint32_t *ks_sts, uint32_t *ks_otpsts,
 	*ks_metadata = req.ack[3];
 	return ret;
 }
+
+/*
+ * @brief      Read key data from OTP
+ * @param[in]  u32Addr     The OTP address
+ * @param[out] u32Data     The data read from OTP
+ * @return   0             success
+ * @return   otherwise     Refer to ST_XXX error code.
+ */
+int  TSI_OTP_Read(uint32_t u32Addr, uint32_t *u32Data)
+{
+	TSI_REQ_T  req;
+	int  ret;
+
+	memset(&req, 0, sizeof(req));
+	req.cmd[0] = (CMD_EXT_OTP_READ << 16);
+	req.cmd[1] = u32Addr;
+	ret = tsi_send_command_and_wait(&req, CMD_TIME_OUT_2S);
+	*u32Data = req.ack[1];
+	return ret;
+}
