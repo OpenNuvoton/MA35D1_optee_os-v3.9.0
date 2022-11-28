@@ -26,7 +26,7 @@
 #define nu_read_reg(reg)	io_read32(crypto_base + (reg))
 
 __aligned(64) static uint32_t param_block[16];
-__aligned(64) static uint8_t tsi_buff[64];
+__aligned(64) static uint32_t tsi_buff[16];
 
 static inline uint32_t swab32(uint32_t x)
 {
@@ -34,19 +34,6 @@ static inline uint32_t swab32(uint32_t x)
 		((x & (uint32_t)0x0000ff00UL) <<  8) |
 		((x & (uint32_t)0x00ff0000UL) >>  8) |
 		((x & (uint32_t)0xff000000UL) >> 24);
-}
-
-static void dump_buff(char *str, uint8_t *buff, int len)
-{
-	int i;
-
-	EMSG("%s\n", str);
-	for (i = 0; i < len; i+= 16) {
-		EMSG("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-			buff[i], buff[i+1], buff[i+2], buff[i+3], buff[i+4], buff[i+5], buff[i+6], buff[i+7],
-			buff[i+8], buff[i+9], buff[i+10], buff[i+11], buff[i+12], buff[i+13], buff[i+14],
-			buff[i+15]);
-	}
 }
 
 static bool is_timeout(TEE_Time *t_start, uint32_t timeout)
@@ -243,19 +230,19 @@ static TEE_Result tsi_aes_run(uint32_t types,
 	cache_operation(TEE_CACHEINVALIDATE,
 			(void *)tsi_buff, sizeof(tsi_buff));
 
-	ret = TSI_Access_Feedback(sid, 1, 4, (void *)tsi_buff);
+	ret = TSI_Access_Feedback(sid, 1, 4, (uint32_t)virt_to_phys(tsi_buff));
 	if (ret != 0) {
 		EMSG("TSI_Access_Feedback failed ret = %d\n", ret);
 		return TEE_ERROR_CRYPTO_FAIL;
 	}
 
 	if (aes_ctl & AES_CTL_KOUTSWAP) {
-		uint32_t  *fdbck = (uint32_t *)tsi_buff;
+		uint32_t  *fdbck = tsi_buff;
 
 		for (i = 0; i < 4; i++)
 			fdbck[i] = swab32(fdbck[i]);
 	}
-	memcpy(&reg_map[AES_FDBCK(0) / 4], tsi_buff, 16);
+	memcpy(&reg_map[AES_FDBCK(0) / 4], (void *)tsi_buff, 16);
 
 	return TEE_SUCCESS;
 }
@@ -409,16 +396,16 @@ static TEE_Result tsi_sha_final(uint32_t types,
 	cache_operation(TEE_CACHEINVALIDATE,
 			(void *)tsi_buff, sizeof(tsi_buff));
 
-	ret = TSI_SHA_Finish(params[0].value.a,      /* sid       */
-			params[0].value.b / 4,       /* wcnt      */
-			reg_map[HMAC_DMACNT / 4],    /* data_cnt  */
-			reg_map[HMAC_SADDR / 4],     /* src_addr  */
-			(uint32_t)tsi_buff           /* dest_addr */
+	ret = TSI_SHA_Finish(params[0].value.a,           /* sid       */
+			params[0].value.b / 4,            /* wcnt      */
+			reg_map[HMAC_DMACNT / 4],         /* data_cnt  */
+			reg_map[HMAC_SADDR / 4],          /* src_addr  */
+			(uint32_t)virt_to_phys(tsi_buff)  /* dest_addr */
 			);
 	if (ret != ST_SUCCESS)
 		return TEE_ERROR_CRYPTO_FAIL;
 
-	memcpy(&reg_map[HMAC_DGST(0) / 4], tsi_buff,  64);
+	memcpy(&reg_map[HMAC_DGST(0) / 4], (void *)tsi_buff,  64);
 	return TEE_SUCCESS;
 }
 
