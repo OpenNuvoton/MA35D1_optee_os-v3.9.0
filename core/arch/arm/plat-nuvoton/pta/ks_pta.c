@@ -125,24 +125,6 @@ static TEE_Result ma35d1_ks_init(void)
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN))
 		return ma35d1_tsi_init();
 
-	if ((io_read32(tsi_base + 0x210) & 0x7) != 0x2) {
-		do {
-			io_write32(tsi_base + 0x100, 0x59);
-			io_write32(tsi_base + 0x100, 0x16);
-			io_write32(tsi_base + 0x100, 0x88);
-		} while (io_read32(tsi_base + 0x100) == 0UL);
-
-		io_write32(tsi_base + 0x240, TSI_PLL_SETTING);
-
-		/* wait PLL stable */
-		while ((io_read32(tsi_base + 0x250) & 0x4) == 0)
-			;
-
-		/* Select TSI HCLK from PLL */
-		io_write32(tsi_base + 0x210, (io_read32(tsi_base +
-			   0x210) & ~0x7) | 0x2);
-	}
-
 	/* enable Key Store engine clock */
 	io_write32(tsi_base + 0x204, io_read32(tsi_base + 0x204) |
 		   (1 << 14));
