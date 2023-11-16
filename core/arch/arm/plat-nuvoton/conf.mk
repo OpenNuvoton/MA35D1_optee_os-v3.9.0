@@ -32,3 +32,13 @@ ifeq ($(PLATFORM_FLAVOR),MA35D1)
 # 2**1 = 2 cores per cluster
 $(call force,CFG_CORE_CLUSTER_SHIFT,1)
 endif
+
+ifeq ($(PLATFORM_FLAVOR),MA35D0)
+# 2**1 = 2 cores per cluster
+$(call force,CFG_CORE_CLUSTER_SHIFT,1)
+endif
+
+ifeq ($(PLATFORM_FLAVOR),MA35H0)
+# 2**1 = 2 cores per cluster
+$(call force,CFG_CORE_CLUSTER_SHIFT,1)
+endif

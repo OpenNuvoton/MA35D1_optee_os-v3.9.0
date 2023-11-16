@@ -18,7 +18,7 @@
 #endif
 #endif /*ARM64*/
 
-#if defined(PLATFORM_FLAVOR_MA35D1)
+#if defined(PLATFORM_FLAVOR_MA35D1) || defined(PLATFORM_FLAVOR_MA35D0) || defined(PLATFORM_FLAVOR_MA35H0)
 
 #define GIC_BASE		0x50801000UL
 #define GICC_OFFSET		0x2000
@@ -57,8 +57,6 @@
 
 #define SYS_CHIPCFG		0x1F4
 #define TSIEN			(0x1 << 8)
-
-#define TSI_PLL_SETTING		0x808CA0	// 160 MHz
 
 #else
 #error "Unknown platform flavor"

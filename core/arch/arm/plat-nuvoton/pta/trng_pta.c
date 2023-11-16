@@ -23,7 +23,7 @@
 #define TRNG_BUSY_TIMEOUT	2000
 
 /*---------------------------------------------------------------------*/
-/*  MA35D1 TRNG registers                                             */
+/*  MA35 Series TRNG registers                                         */
 /*---------------------------------------------------------------------*/
 #define CTRL			(trng_base + 0x000)
 #define CTRL_CMD_OFFSET			(0)
@@ -121,7 +121,7 @@
 #define TCMD_RUN_KAT		0x8       /* Run KAT on DRBG or entropy source */
 #define TCMD_ZEROIZE		0xf       /* Zeroize                    */
 
-static int ma35d1_trng_wait_busy_clear(vaddr_t trng_base)
+static int ma35_trng_wait_busy_clear(vaddr_t trng_base)
 {
 	TEE_Time  t_start, t_cur;
 	uint32_t  mytime;
@@ -138,34 +138,32 @@ static int ma35d1_trng_wait_busy_clear(vaddr_t trng_base)
 	return 0;
 }
 
-static int ma35d1_trng_issue_command(vaddr_t trng_base, int cmd)
+static int ma35_trng_issue_command(vaddr_t trng_base, int cmd)
 {
 	TEE_Time  t_start, t_cur;
 	uint32_t  mytime;
 
-	if (ma35d1_trng_wait_busy_clear(trng_base) != 0)
+	if (ma35_trng_wait_busy_clear(trng_base) != 0)
 		return TEE_ERROR_TRNG_BUSY;
 
-	io_write32(CTRL, (io_read32(CTRL) &
-		   ~CTRL_CMD_MASK) | (cmd << CTRL_CMD_OFFSET));
+	io_write32(CTRL, (io_read32(CTRL) & ~CTRL_CMD_MASK) | (cmd << CTRL_CMD_OFFSET));
 
 	tee_time_get_sys_time(&t_start);
 	while (!(io_read32(ISTAT) & ISTAT_DONE)) {
 		tee_time_get_sys_time(&t_cur);
 		mytime = (t_cur.seconds - t_start.seconds) * 1000 +
-		    (int)t_cur.millis - (int)t_start.millis;
+			 (int)t_cur.millis - (int)t_start.millis;
 
 		if (mytime > TRNG_BUSY_TIMEOUT) {
 			EMSG("TRNG command %d timeout! ISTAT=0x%x, SMODE=0x%x.\n",
-			     cmd, io_read32(ISTAT),
-			     io_read32(SMODE));
+			     cmd, io_read32(ISTAT), io_read32(SMODE));
 			return TEE_ERROR_TRNG_COMMAND;
 		}
 	}
 	return 0;
 }
 
-static int ma35d1_trng_gen_nonce(vaddr_t trng_base, uint32_t *nonce)
+static int ma35_trng_gen_nonce(vaddr_t trng_base, uint32_t *nonce)
 {
 	int   i, j, loop, ret;
 
@@ -177,29 +175,28 @@ static int ma35d1_trng_gen_nonce(vaddr_t trng_base, uint32_t *nonce)
 		loop = 2;
 
 	for (i = 0; i < loop; i++) {
-		if (ma35d1_trng_wait_busy_clear(trng_base) != 0)
+		if (ma35_trng_wait_busy_clear(trng_base) != 0)
 			return TEE_ERROR_TRNG_BUSY;
 
 		for (j = 0; j < 16; j++)
 			io_write32(NPA_DATA(j), nonce[j]);
 
-		ret = ma35d1_trng_issue_command(trng_base, TCMD_GEN_NONCE);
+		ret = ma35_trng_issue_command(trng_base, TCMD_GEN_NONCE);
 		if (ret != 0)
 			return TEE_ERROR_TRNG_GEN_NOISE;
 	}
 	return 0;
 }
 
-static int ma35d1_trng_create_state(vaddr_t trng_base)
+static int ma35_trng_create_state(vaddr_t trng_base)
 {
-	if (ma35d1_trng_wait_busy_clear(trng_base) != 0)
+	if (ma35_trng_wait_busy_clear(trng_base) != 0)
 		return TEE_ERROR_TRNG_BUSY;
 
-	return ma35d1_trng_issue_command(trng_base, TCMD_CREATE_STATE);
+	return ma35_trng_issue_command(trng_base, TCMD_CREATE_STATE);
 }
 
-static TEE_Result ma35d1_trng_init(uint32_t types,
-				    TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result ma35_trng_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
 	uint32_t nonce[64] = { 0xc47b0294, 0xdbbbee0f, 0xec4757f2, 0x2ffeee35,
 			       0x87ca4730, 0xc3d33b69, 0x1df38bab, 0x63ac0a6b,
@@ -218,17 +215,18 @@ static TEE_Result ma35d1_trng_init(uint32_t types,
 			       0xee42614d, 0x73c2ace4, 0xbaed0e9c, 0x9a12145d,
 			       0xed66a951, 0xeac1e50f, 0x690c563b, 0x5dccdc9d
 			       };
-	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t trng_base = core_mmu_get_va(TRNG_BASE, MEM_AREA_IO_SEC);
 	vaddr_t tsi_base = core_mmu_get_va(TSI_BASE, MEM_AREA_IO_SEC);
-	int	ret;
+	int ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_OUTPUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE)) {
+				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
-	}
+
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 
@@ -247,12 +245,13 @@ static TEE_Result ma35d1_trng_init(uint32_t types,
 
 		return TEE_SUCCESS;
 	}
+#endif
 
 	/* enable TRNG engine clock */
 	io_write32(tsi_base + 0x20c, io_read32(tsi_base + 0x20c) |
 		   (1 << 25));
 
-	if (ma35d1_trng_wait_busy_clear(trng_base) != 0)
+	if (ma35_trng_wait_busy_clear(trng_base) != 0)
 		return TEE_ERROR_TRNG_BUSY;
 
 	if (io_read32(STAT) & (STAT_STARTUP_TEST_STUCK |
@@ -264,11 +263,11 @@ static TEE_Result ma35d1_trng_init(uint32_t types,
 	/* SELECT_ALG_AES_256 */
 	io_write32(MODE, io_read32(MODE) | MODE_SEC_ALG);
 
-	ret = ma35d1_trng_gen_nonce(trng_base, nonce);
+	ret = ma35_trng_gen_nonce(trng_base, nonce);
 	if (ret != 0)
 		return ret;
 
-	ret = ma35d1_trng_create_state(trng_base);
+	ret = ma35_trng_create_state(trng_base);
 	if (ret != 0)
 		return ret;
 
@@ -279,21 +278,18 @@ static TEE_Result ma35d1_trng_init(uint32_t types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_trng_read(uint32_t types,
-                                    TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result ma35_trng_read(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
 	uint32_t *rdata = NULL;
 	uint32_t rq_size = 0, get_size = 0;
-	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t trng_base = core_mmu_get_va(TRNG_BASE, MEM_AREA_IO_SEC);
 	int	i, ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE)) {
+				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
-	}
 
 	rq_size = params[0].memref.size;
 
@@ -304,25 +300,28 @@ static TEE_Result ma35d1_trng_read(uint32_t types,
 	if (!rdata)
 		return TEE_ERROR_BAD_PARAMETERS;
 
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		/*
 		 * TSI enabled. Invoke TSI command and return here.
 		 */
 		cache_operation(TEE_CACHEINVALIDATE, rdata, rq_size);
 
-		ret = TSI_TRNG_Gen_Random(rq_size / 4,
-					  (uint32_t)virt_to_phys(rdata));
+		ret = TSI_TRNG_Gen_Random(rq_size / 4, (uint32_t)virt_to_phys(rdata));
 		if (ret != ST_SUCCESS)
 			return TEE_ERROR_TRNG_FAILED;
 
 		return 0;
 	}
+#endif
 
 	while (rq_size >= 4) {
-		if (ma35d1_trng_wait_busy_clear(trng_base) != 0)
+		if (ma35_trng_wait_busy_clear(trng_base) != 0)
 			return TEE_ERROR_TRNG_BUSY;
 
-		ret = ma35d1_trng_issue_command(trng_base, TCMD_GEN_RANDOM);
+		ret = ma35_trng_issue_command(trng_base, TCMD_GEN_RANDOM);
 		if (ret != 0)
 			return ret;
 
@@ -348,10 +347,10 @@ static TEE_Result invoke_command(void *pSessionContext __unused,
 
 	switch (nCommandID) {
 	case PTA_CMD_TRNG_INIT:
-		return ma35d1_trng_init(nParamTypes, pParams);
+		return ma35_trng_init(nParamTypes, pParams);
 	
 	case PTA_CMD_TRNG_READ:
-		return ma35d1_trng_read(nParamTypes, pParams);
+		return ma35_trng_read(nParamTypes, pParams);
 	default:
 		break;
 	}

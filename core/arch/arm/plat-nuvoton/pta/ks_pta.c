@@ -22,7 +22,7 @@
 #define KS_BUSY_TIMEOUT		2000
 
 /*----------------------------------------------------------------------*/
-/*  MA35D1 OTP registers                                                */
+/*  MA35 Series OTP registers                                           */
 /*----------------------------------------------------------------------*/
 #define OTP_CTL			(otp_base + 0x00)
 #define OTP_CTL_START			(0x1 << 0)
@@ -48,7 +48,7 @@
 #define OTP_CMD_READ_UID	(0xD << 4)
 
 /*----------------------------------------------------------------------*/
-/*  MA35D1 Key Store registers                                         */
+/*  MA35 Series Key Store registers                                     */
 /*----------------------------------------------------------------------*/
 #define KS_CTL			(ks_base + 0x00)
 #define KS_CTL_START			(0x1 << 0)
@@ -115,15 +115,18 @@ static bool is_timeout(TEE_Time *t_start, uint32_t timeout)
 	return false;
 }
 
-static TEE_Result ma35d1_ks_init(void)
+static TEE_Result ma35_ks_init(void)
 {
-	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t ks_base = core_mmu_get_va(KS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t tsi_base = core_mmu_get_va(TSI_BASE, MEM_AREA_IO_SEC);
 	TEE_Time  t_start;
 
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN))
 		return ma35d1_tsi_init();
+#endif
 
 	/* enable Key Store engine clock */
 	io_write32(tsi_base + 0x204, io_read32(tsi_base + 0x204) |
@@ -150,16 +153,13 @@ static TEE_Result ma35d1_ks_init(void)
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_ks_read(uint32_t types,
-				  TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result ma35_ks_read(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	vaddr_t   sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t   ks_base = core_mmu_get_va(KS_BASE, MEM_AREA_IO_SEC);
 	uint32_t  offset, cont_msk, remain_cnt;
 	uint32_t  *key_buff;
 	uint32_t  i, cnt;
 	TEE_Time  t_start;
-	int       ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
@@ -185,6 +185,10 @@ static TEE_Result ma35d1_ks_read(uint32_t types,
 
 	cache_operation(TEE_CACHEINVALIDATE, key_buff, remain_cnt * 4);
 
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t   sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+	int ret;
+
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		ret = TSI_KS_Read(params[0].value.a,        /* eType      */
 			params[0].value.b,                  /* i32KeyIdx  */
@@ -197,6 +201,7 @@ static TEE_Result ma35d1_ks_read(uint32_t types,
 		}
 		return TEE_SUCCESS;
 	}
+#endif
 
 	if (io_read32(KS_STS) & KS_STS_BUSY) {
 		EMSG("KS is busy!\n");
@@ -251,17 +256,14 @@ static TEE_Result ma35d1_ks_read(uint32_t types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_ks_write(uint32_t types,
-				   TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result ma35_ks_write(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	vaddr_t   sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t   ks_base = core_mmu_get_va(KS_BASE, MEM_AREA_IO_SEC);
 	uint32_t  offset, cont_msk, buff_remain, key_wcnt;
 	uint32_t  *key_buff;
 	uint32_t  i, cnt;
 	uint32_t  metadata;
 	TEE_Time  t_start;
-	int       ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
@@ -283,6 +285,10 @@ static TEE_Result ma35d1_ks_write(uint32_t types,
 
 	metadata = (params[0].value.a << KS_META_DST_POS) | params[0].value.b;
 
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+	int ret;
+
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		cache_operation(TEE_CACHEFLUSH, key_buff, buff_remain * 4);
 		if (params[0].value.a == KS_OTP)
@@ -301,6 +307,7 @@ static TEE_Result ma35d1_ks_write(uint32_t types,
 		}
 		return TEE_SUCCESS;
 	}
+#endif
 
 	if (io_read32(KS_STS) & KS_STS_BUSY) {
 		EMSG("KS is busy!\n");
@@ -366,13 +373,10 @@ static TEE_Result ma35d1_ks_write(uint32_t types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_ks_erase(uint32_t types,
-				   TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result ma35_ks_erase(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	vaddr_t   sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t   ks_base = core_mmu_get_va(KS_BASE, MEM_AREA_IO_SEC);
 	TEE_Time  t_start;
-	int       ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_NONE,
@@ -393,6 +397,10 @@ static TEE_Result ma35d1_ks_erase(uint32_t types,
 		}
 	}
 
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t   sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+	int ret;
+
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		ret = TSI_KS_EraseKey(params[0].value.a, params[0].value.b);
 		if (ret != ST_SUCCESS) {
@@ -401,6 +409,7 @@ static TEE_Result ma35d1_ks_erase(uint32_t types,
 		}
 		return TEE_SUCCESS;
 	}
+#endif
 
 	if (io_read32(KS_STS) & KS_STS_BUSY) {
 		EMSG("KS is busy!\n");
@@ -433,12 +442,14 @@ static TEE_Result ma35d1_ks_erase(uint32_t types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_ks_erase_all(void)
+static TEE_Result ma35_ks_erase_all(void)
 {
-	vaddr_t   sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t   ks_base = core_mmu_get_va(KS_BASE, MEM_AREA_IO_SEC);
 	TEE_Time  t_start;
-	int       ret;
+
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+	int ret;
 
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		ret = TSI_KS_EraseAll();
@@ -448,6 +459,7 @@ static TEE_Result ma35d1_ks_erase_all(void)
 		}
 		return TEE_SUCCESS;
 	}
+#endif
 
 	if (io_read32(KS_STS) & KS_STS_BUSY) {
 		EMSG("KS is busy!\n");
@@ -478,13 +490,10 @@ static TEE_Result ma35d1_ks_erase_all(void)
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_ks_revoke(uint32_t types,
-				    TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result ma35_ks_revoke(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	vaddr_t   sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t   ks_base = core_mmu_get_va(KS_BASE, MEM_AREA_IO_SEC);
 	TEE_Time  t_start;
-	int       ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_NONE,
@@ -505,6 +514,10 @@ static TEE_Result ma35d1_ks_revoke(uint32_t types,
 		}
 	}
 
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+	int ret;
+
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		ret = TSI_KS_RevokeKey(params[0].value.a, params[0].value.b);
 		if (ret != ST_SUCCESS) {
@@ -513,6 +526,7 @@ static TEE_Result ma35d1_ks_revoke(uint32_t types,
 		}
 		return TEE_SUCCESS;
 	}
+#endif
 
 	if (io_read32(KS_STS) & KS_STS_BUSY) {
 		EMSG("KS is busy!\n");
@@ -545,13 +559,10 @@ static TEE_Result ma35d1_ks_revoke(uint32_t types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_ks_remain(uint32_t types,
-				    TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result ma35_ks_remain(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	vaddr_t   sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t   ks_base = core_mmu_get_va(KS_BASE, MEM_AREA_IO_SEC);
 	uint32_t  reg_data;
-	int       ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_OUTPUT,
 				     TEE_PARAM_TYPE_NONE,
@@ -559,6 +570,10 @@ static TEE_Result ma35d1_ks_remain(uint32_t types,
 				     TEE_PARAM_TYPE_NONE)) {
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
+
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+	int ret;
 
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		ret = TSI_KS_GetRemainSize(&params[0].value.a);
@@ -568,6 +583,7 @@ static TEE_Result ma35d1_ks_remain(uint32_t types,
 		}
 		return TEE_SUCCESS;
 	}
+#endif
 
 	if (io_read32(KS_STS) & KS_STS_BUSY) {
 		EMSG("KS is busy!\n");
@@ -583,15 +599,12 @@ static TEE_Result ma35d1_ks_remain(uint32_t types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_otp_read(uint32_t types,
-				  TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result ma35_otp_read(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	vaddr_t   sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t   otp_base = core_mmu_get_va(OTP_BASE, MEM_AREA_IO_SEC);
 	uint32_t  otp_addr, wcnt, i;
 	uint32_t  *key_buff;
 	TEE_Time  t_start;
-	int       ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
@@ -611,6 +624,10 @@ static TEE_Result ma35d1_otp_read(uint32_t types,
 
 	cache_operation(TEE_CACHEINVALIDATE, key_buff, wcnt * 4);
 
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+	int ret;
+
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		for (i = 0; i < wcnt; i ++) {
 			ret = TSI_OTP_Read(otp_addr + i * 4, &key_buff[i]);
@@ -621,6 +638,7 @@ static TEE_Result ma35d1_otp_read(uint32_t types,
 		}
 		return TEE_SUCCESS;
 	}
+#endif
 
 	for (i = 0; i < wcnt; i++) {
 		io_write32(OTP_ADDR, otp_addr + i * 4);
@@ -652,28 +670,28 @@ static TEE_Result invoke_command(void *pSessionContext __unused,
 
 	switch (nCommandID) {
 	case PTA_CMD_KS_INIT:
-		return ma35d1_ks_init();
+		return ma35_ks_init();
 
 	case PTA_CMD_KS_READ:
-		return ma35d1_ks_read(nParamTypes, pParams);
+		return ma35_ks_read(nParamTypes, pParams);
 
 	case PTA_CMD_KS_WRITE:
-		return ma35d1_ks_write(nParamTypes, pParams);
+		return ma35_ks_write(nParamTypes, pParams);
 
 	case PTA_CMD_KS_ERASE:
-		return ma35d1_ks_erase(nParamTypes, pParams);
+		return ma35_ks_erase(nParamTypes, pParams);
 
 	case PTA_CMD_KS_ERASE_ALL:
-		return ma35d1_ks_erase_all();
+		return ma35_ks_erase_all();
 
 	case PTA_CMD_KS_REVOKE:
-		return ma35d1_ks_revoke(nParamTypes, pParams);
+		return ma35_ks_revoke(nParamTypes, pParams);
 
 	case PTA_CMD_KS_REMAIN:
-		return ma35d1_ks_remain(nParamTypes, pParams);
+		return ma35_ks_remain(nParamTypes, pParams);
 
 	case PTA_CMD_OTP_READ:
-		return ma35d1_otp_read(nParamTypes, pParams);
+		return ma35_otp_read(nParamTypes, pParams);
 
 	default:
 		break;

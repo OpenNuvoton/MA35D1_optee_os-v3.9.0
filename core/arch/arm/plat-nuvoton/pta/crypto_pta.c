@@ -50,14 +50,16 @@ static bool is_timeout(TEE_Time *t_start, uint32_t timeout)
 	return false;
 }
 
-static TEE_Result ma35d1_crypto_init(void)
+static TEE_Result ma35_crypto_init(void)
 {
-	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 	vaddr_t tsi_base = core_mmu_get_va(TSI_BASE, MEM_AREA_IO_SEC);
+
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN))
 		return ma35d1_tsi_init();
-
+#endif
 	/* enable Crypto engine clock */
 	io_write32(tsi_base + 0x204, io_read32(tsi_base + 0x204) | (1 << 12));
 	return TEE_SUCCESS;
@@ -229,7 +231,7 @@ static TEE_Result tsi_aes_run(uint32_t types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_aes_run(uint32_t types,
+static TEE_Result ma35_aes_run(uint32_t types,
 				  TEE_Param params[TEE_NUM_PARAMS])
 {
 	vaddr_t   crypto_base = core_mmu_get_va(CRYPTO_BASE, MEM_AREA_IO_SEC);
@@ -391,7 +393,7 @@ static TEE_Result tsi_sha_final(uint32_t types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_sha_update(uint32_t types,
+static TEE_Result ma35_sha_update(uint32_t types,
 				     TEE_Param params[TEE_NUM_PARAMS])
 {
 	vaddr_t   crypto_base = core_mmu_get_va(CRYPTO_BASE, MEM_AREA_IO_SEC);
@@ -546,7 +548,7 @@ static TEE_Result tsi_ecc_pmul(uint32_t types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_ecc_pmul(uint32_t types,
+static TEE_Result ma35_ecc_pmul(uint32_t types,
 				   TEE_Param params[TEE_NUM_PARAMS])
 {
 	vaddr_t   crypto_base = core_mmu_get_va(CRYPTO_BASE, MEM_AREA_IO_SEC);
@@ -673,7 +675,7 @@ static TEE_Result tsi_rsa_run(uint32_t types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ma35d1_rsa_run(uint32_t types,
+static TEE_Result ma35_rsa_run(uint32_t types,
 				  TEE_Param params[TEE_NUM_PARAMS])
 {
 	vaddr_t   crypto_base = core_mmu_get_va(CRYPTO_BASE, MEM_AREA_IO_SEC);
@@ -731,19 +733,24 @@ static TEE_Result invoke_command(void *pSessionContext __unused,
 				 uint32_t nCommandID, uint32_t nParamTypes,
 				 TEE_Param pParams[TEE_NUM_PARAMS])
 {
-	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
-	int   tsi_en;
+	int tsi_en;
 
 	FMSG("command entry point for pseudo-TA \"%s\"", PTA_NAME);
+
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
 
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN))
 		tsi_en = 1;
 	else
 		tsi_en = 0;
+#else   /* PLATFORM_FLAVOR_MA35D0 and PLATFORM_FLAVOR_MA35H0 */
+	tsi_en = 0;
+#endif
 
 	switch (nCommandID) {
 	case PTA_CMD_CRYPTO_INIT:
-		return ma35d1_crypto_init();
+		return ma35_crypto_init();
 
 	case PTA_CMD_CRYPTO_OPEN_SESSION:
 		if (tsi_en)
@@ -761,7 +768,7 @@ static TEE_Result invoke_command(void *pSessionContext __unused,
 		if (tsi_en)
 			return tsi_aes_run(nParamTypes, pParams);
 		else
-			return ma35d1_aes_run(nParamTypes, pParams);
+			return ma35_aes_run(nParamTypes, pParams);
 
 	case PTA_CMD_CRYPTO_SHA_START:
 		if (tsi_en)
@@ -773,25 +780,25 @@ static TEE_Result invoke_command(void *pSessionContext __unused,
 		if (tsi_en)
 			return tsi_sha_update(nParamTypes, pParams);
 		else
-			return ma35d1_sha_update(nParamTypes, pParams);
+			return ma35_sha_update(nParamTypes, pParams);
 
 	case PTA_CMD_CRYPTO_SHA_FINAL:
 		if (tsi_en)
 			return tsi_sha_final(nParamTypes, pParams);
 		else
-			return ma35d1_sha_update(nParamTypes, pParams);
+			return ma35_sha_update(nParamTypes, pParams);
 
 	case PTA_CMD_CRYPTO_ECC_PMUL:
 		if (tsi_en)
 			return tsi_ecc_pmul(nParamTypes, pParams);
 		else
-			return ma35d1_ecc_pmul(nParamTypes, pParams);
+			return ma35_ecc_pmul(nParamTypes, pParams);
 
 	case PTA_CMD_CRYPTO_RSA_RUN:
 		if (tsi_en)
 			return tsi_rsa_run(nParamTypes, pParams);
 		else
-			return ma35d1_rsa_run(nParamTypes, pParams);
+			return ma35_rsa_run(nParamTypes, pParams);
 
 	default:
 		break;

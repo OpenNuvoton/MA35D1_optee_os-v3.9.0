@@ -17,7 +17,9 @@
 #include <io.h>
 #include <tsi_cmd.h>
 
+#if defined(PLATFORM_FLAVOR_MA35D1)
 #define LOAD_TSI_PATCH
+#endif
 
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, UART0_BASE, UART0_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, SYS_BASE, SYS_REG_SIZE);
@@ -54,6 +56,7 @@ void console_init(void)
 	register_serial_console(&console_data.chip);
 }
 
+#if defined(PLATFORM_FLAVOR_MA35D1)
 int ma35d1_tsi_init(void)
 {
 	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
@@ -96,3 +99,4 @@ int ma35d1_tsi_init(void)
 #endif
 	return 0;
 }
+#endif
