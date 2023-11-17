@@ -69,29 +69,27 @@ int ma35d1_tsi_init(void)
 		uint32_t  version_code;
 
 		/* enable WHC1 clock */
-		io_write32(sys_base + 0x208,
-			   io_read32(sys_base + 0x208) | (1 << 5));
+		io_write32(sys_base + 0x208, io_read32(sys_base + 0x208) | (1 << 5));
 
 		ret = TSI_Get_Version(&version_code);
-		if (ret == ST_SUCCESS)
-			return 0;   /* TSI is ready. */
-
-		while (1) {
-			ret = TSI_Get_Version(&version_code);
-			if (ret == ST_SUCCESS) {
-				EMSG("TSI F/W version: %x\n", version_code);
-				break;
-			}
-			if (ret == ST_WAIT_TSI_SYNC) {
-				EMSG("Wait TSI_Sync.\n");
-				TSI_Sync();
+		if (ret != ST_SUCCESS) {
+			/* TSI is not ready. Init TSI. */
+			while (1) {
+				ret = TSI_Get_Version(&version_code);
+				if (ret == ST_SUCCESS) {
+					EMSG("TSI F/W version: %x\n", version_code);
+					break;
+				}
+				if (ret == ST_WAIT_TSI_SYNC) {
+					EMSG("Wait TSI_Sync.\n");
+					TSI_Sync();
+				}
 			}
 		}
 	}
 
 #ifdef LOAD_TSI_PATCH
-	ret = TSI_Load_Image((uint32_t)virt_to_phys(tsi_patch_image),
-				   	sizeof(tsi_patch_image));
+	ret = TSI_Load_Image((uint32_t)virt_to_phys(tsi_patch_image), sizeof(tsi_patch_image));
 	if (ret == 0)
 		EMSG("Load TSI image successful.\n");
 	else
