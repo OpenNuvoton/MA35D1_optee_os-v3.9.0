@@ -9,7 +9,9 @@
 #include <kernel/boot.h>
 #include <kernel/panic.h>
 #include <kernel/pm_stubs.h>
+#include <kernel/tee_common_otp.h>
 #include <mm/core_memprot.h>
+#include <tee/cache.h>
 #include <platform_config.h>
 #include <stdint.h>
 #include <tee/entry_std.h>
@@ -96,5 +98,28 @@ int ma35d1_tsi_init(void)
 		EMSG("Load TSI image failed!! %d\n", ret);
 #endif
 	return 0;
+}
+
+__aligned(64) static unsigned int huk_key_buff[4] = { 0x35d1, 0x980, 0x970, 0x00 };
+
+TEE_Result tee_otp_get_hw_unique_key(struct tee_hw_unique_key *hwkey)
+{
+	uint32_t *huk_key = (uint32_t *)virt_to_phys(huk_key_buff);
+	TEE_Result ret;
+
+	ret = ma35d1_tsi_init();
+	if (ret != 0)
+		return TEE_ERROR_GENERIC;
+
+	cache_operation(TEE_CACHEINVALIDATE, huk_key_buff, sizeof(huk_key_buff));
+
+	ret = TSI_KS_Read(0x2, 0, huk_key, 4);
+	if (ret != ST_SUCCESS) {
+		 EMSG("%s - TSI_KS_Read failed! 0x%x\n", __func__, ret);
+	}
+
+	memcpy(&hwkey->data[0], &huk_key[0], sizeof(hwkey->data));
+
+	return TEE_SUCCESS;
 }
 #endif
