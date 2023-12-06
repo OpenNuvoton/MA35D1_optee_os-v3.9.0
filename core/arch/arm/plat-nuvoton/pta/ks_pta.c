@@ -250,7 +250,7 @@ static TEE_Result ma35_ks_read(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 
 	/* Check error flag */
 	if (io_read32(KS_STS) & KS_STS_EIF) {
-		EMSG("KS EIF set on writing SRAM keys!\n");
+		EMSG("KS EIF set on reading keys!\n");
 		return TEE_ERROR_KS_FAIL;
 	}
 	return TEE_SUCCESS;
@@ -364,7 +364,7 @@ static TEE_Result ma35_ks_write(uint32_t types, TEE_Param params[TEE_NUM_PARAMS]
 
 	/* Check error flag */
 	if (io_read32(KS_STS) & KS_STS_EIF) {
-		EMSG("KS EIF set on writing SRAM keys!\n");
+		EMSG("KS EIF set on writing keys!\n");
 		return TEE_ERROR_KS_FAIL;
 	}
 
