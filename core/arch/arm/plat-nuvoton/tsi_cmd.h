@@ -95,6 +95,7 @@
 #define ST_SIG_VERIFY_ERROR     0x70 /* ECC/RSA signature verification failed    */
 #define ST_KS_READ_PROTECT      0x80 /* Key Store key entry cannot read by CPU   */
 #define ST_KS_FULL              0x81 /* Key Store full                           */
+#define ST_KS_ERR               0x82 /* Key Store key general error              */
 #define ST_WHC_TX_BUSY          0xd1 /* All TX channel of Wormhole are busy      */
 #define ST_CMD_ACK_TIME_OUT     0xd2 /* TSI does not ack command in time limit   */
 

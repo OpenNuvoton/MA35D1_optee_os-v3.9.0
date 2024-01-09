@@ -809,13 +809,17 @@ int TSI_ECC_GenPublicKey(int curve_id, int is_ecdh, int psel,
 			 int d_knum, uint32_t priv_key, uint32_t pub_key)
 {
 	TSI_REQ_T req;
+	int ret;
 
 	memset(&req, 0, sizeof(req));
 	req.cmd[0] = (CMD_ECC_GEN_PUB_KEY << 16) | curve_id;
 	req.cmd[1] = (is_ecdh << 10) | (psel << 8) | d_knum;
 	req.cmd[2] = priv_key;
 	req.cmd[3] = pub_key;
-	return tsi_send_command_and_wait(&req, CMD_TIME_OUT_2S);
+	ret = tsi_send_command_and_wait(&req, CMD_TIME_OUT_2S);
+	if (req.ack[1] & 0x20000)   /* check KSERR(CRYPTO_ECC_STS[17])  */
+		return ST_KS_ERR;
+	return ret;
 }
 
 /*
@@ -876,6 +880,7 @@ int TSI_ECC_VerifySignature(int curve_id, int psel, int x_knum,
 	req.cmd[0] = (CMD_ECC_VERIFY_SIG << 16) | curve_id;
 	req.cmd[1] = (psel << 16) | (y_knum << 8) | x_knum;
 	req.cmd[2] = param_addr;
+
 	return tsi_send_command_and_wait(&req, CMD_TIME_OUT_2S);
 }
 
@@ -907,6 +912,7 @@ int TSI_ECC_Multiply(int curve_id, int type, int msel, int sps,
 		     uint32_t param_addr, uint32_t dest_addr)
 {
 	TSI_REQ_T req;
+	int ret;
 
 	memset(&req, 0, sizeof(req));
 	req.cmd[0] = (CMD_ECC_MULTIPLY << 16) | curve_id;
@@ -914,7 +920,10 @@ int TSI_ECC_Multiply(int curve_id, int type, int msel, int sps,
 			(m_knum << 16) | (x_knum << 8) | (y_knum);
 	req.cmd[2] = param_addr;
 	req.cmd[3] = dest_addr;
-	return tsi_send_command_and_wait(&req, CMD_TIME_OUT_2S);
+	ret = tsi_send_command_and_wait(&req, CMD_TIME_OUT_2S);
+	if (req.ack[1] & 0x20000)   /* check KSERR(CRYPTO_ECC_STS[17])  */
+		return ST_KS_ERR;
+	return ret;
 }
 
 /*

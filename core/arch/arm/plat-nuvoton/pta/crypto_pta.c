@@ -474,14 +474,69 @@ static void Hex2Reg(char input[], uint32_t reg[])
 	}
 }
 
-static TEE_Result tsi_ecc_pmul(uint32_t types,
-			       TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result tsi_ecc_key_gen(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	uint32_t  *reg_map;
-	uint32_t  reg_map_pa;
-	uint32_t  ecc_ksctl, ecc_ksxy;
-	int       rssrc, msel, sps;
-	int       ret;
+	uint32_t *reg_map;
+	uint32_t reg_map_pa;
+	uint32_t ecc_ksctl;
+	int rssrc, psel;
+	int ret;
+
+	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
+				     TEE_PARAM_TYPE_MEMREF_INOUT,
+				     TEE_PARAM_TYPE_VALUE_INPUT,
+				     TEE_PARAM_TYPE_NONE)) {
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+
+	reg_map = params[1].memref.buffer;
+	reg_map_pa = (uint32_t)virt_to_phys(reg_map);
+
+	ecc_ksctl = reg_map[ECC_KSCTL / 4];
+
+	if (ecc_ksctl & ECC_KSCTL_RSRCK) {
+		rssrc = (ecc_ksctl & ECC_KSCTL_RSSRCK_MASK) >> ECC_KSCTL_RSSRCK_OFFSET;
+		if (rssrc == 0)
+			psel = 2; /* Key is from KS SRAM */
+		else
+			psel = 1; /* Key is from KS OTP */
+	} else {
+		psel = 3; /* Key is from parameter block */
+	}
+
+	cache_operation(TEE_CACHEFLUSH, (void *)((uint64_t)reg_map +
+				params[2].value.a), 576);
+
+	cache_operation(TEE_CACHEINVALIDATE, (void *)((uint64_t)reg_map +
+				params[2].value.b), 576 * 2);
+
+	ret = TSI_ECC_GenPublicKey(params[0].value.a,         /* curve_id   */
+			(ecc_ksctl & ECC_KSCTL_ECDH) ? 1 : 0, /* type       */
+			psel,
+			(ecc_ksctl & ECC_KSCTL_NUMK_MASK) >>
+				ECC_KSCTL_NUMK_OFFSET,        /* d_knum     */
+			reg_map_pa + params[2].value.a,       /* param_addr */
+			reg_map_pa + params[2].value.b        /* dest_addr  */
+			);
+	if (ret != ST_SUCCESS)
+		return TEE_ERROR_CRYPTO_FAIL;
+
+	Hex2Reg((char *)&reg_map[params[2].value.b / 4],
+		(uint32_t *)&reg_map[ECC_X1(0) / 4]);
+
+	Hex2Reg((char *)&reg_map[(params[2].value.b + 0x240) / 4],
+		(uint32_t *)&reg_map[ECC_Y1(0) / 4]);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result tsi_ecc_pmul(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+{
+	uint32_t *reg_map;
+	uint32_t reg_map_pa;
+	uint32_t ecc_ksctl, ecc_ksxy;
+	int rssrc, msel, sps;
+	int ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
@@ -495,7 +550,7 @@ static TEE_Result tsi_ecc_pmul(uint32_t types,
 
 	ecc_ksctl = reg_map[ECC_KSCTL / 4];
 	ecc_ksxy = reg_map[ECC_KSXY / 4];
-		reg_map_pa = (uint32_t)virt_to_phys(reg_map);
+	reg_map_pa = (uint32_t)virt_to_phys(reg_map);
 
 	if (ecc_ksctl & ECC_KSCTL_RSRCK) {
 		rssrc = (ecc_ksctl & ECC_KSCTL_RSSRCK_MASK) >> ECC_KSCTL_RSSRCK_OFFSET;
@@ -626,6 +681,107 @@ static TEE_Result ma35_ecc_pmul(uint32_t types,
 
 	for (i = 0; i < ECC_KEY_WCNT; i++)
 		reg_map[ECC_Y2(i) / 4] = nu_read_reg(ECC_Y2(i));
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result tsi_ecc_sig_verify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+{
+	uint32_t *reg_map;
+	uint32_t reg_map_pa;
+	uint32_t ecc_ksxy;
+	int psel;
+	int ret;
+
+	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
+				     TEE_PARAM_TYPE_MEMREF_INOUT,
+				     TEE_PARAM_TYPE_VALUE_INPUT,
+				     TEE_PARAM_TYPE_NONE)) {
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+
+	reg_map = params[1].memref.buffer;
+	reg_map_pa = (uint32_t)virt_to_phys(reg_map);
+
+	ecc_ksxy = reg_map[ECC_KSXY / 4];
+	reg_map_pa = (uint32_t)virt_to_phys(reg_map);
+
+	if (ecc_ksxy & ECC_KSXY_RSRCXY) {
+		psel = (ecc_ksxy & ECC_KSXY_RSSRCX_MASK) >> ECC_KSXY_RSSRCX_OFFSET;
+		if (psel == 0)
+			psel = 2; /* XY key from KS SRAM */
+		else
+			psel = 1; /* XY key from KS OTP */
+	} else {
+		psel = 3; /* XY key from parameter block */
+	}
+
+	cache_operation(TEE_CACHEFLUSH, (void *)((uint64_t)reg_map +
+				params[2].value.a), 576 * 5);
+
+	ret = TSI_ECC_VerifySignature(params[0].value.a,                /* curve_id   */
+				      psel,
+				      (ecc_ksxy & ECC_KSXY_NUMX_MASK) >>
+				        ECC_KSXY_NUMX_OFFSET,           /* x_knum     */
+				      (ecc_ksxy & ECC_KSXY_NUMY_MASK) >>
+				        ECC_KSXY_NUMY_OFFSET,           /* y_knum     */
+				      reg_map_pa + params[2].value.a    /* param_addr */
+				      );
+	if (ret != ST_SUCCESS) {
+		if (ret == ST_SIG_VERIFY_ERROR)
+			return TEE_ERROR_CRYPTO_ECC_VERIFY;
+		else
+			return TEE_ERROR_CRYPTO_FAIL;
+	}
+	return TEE_SUCCESS;
+}
+
+static TEE_Result tsi_ecc_sig_gen(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+{
+	uint32_t *reg_map;
+	uint32_t reg_map_pa;
+	uint32_t ecc_ksctl;
+	int rssrc, psel;
+	int ret;
+
+	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
+				     TEE_PARAM_TYPE_MEMREF_INOUT,
+				     TEE_PARAM_TYPE_VALUE_INPUT,
+				     TEE_PARAM_TYPE_NONE)) {
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+
+	reg_map = params[1].memref.buffer;
+	reg_map_pa = (uint32_t)virt_to_phys(reg_map);
+
+	ecc_ksctl = reg_map[ECC_KSCTL / 4];
+
+	if (ecc_ksctl & ECC_KSCTL_RSRCK) {
+		rssrc = (ecc_ksctl & ECC_KSCTL_RSSRCK_MASK) >> ECC_KSCTL_RSSRCK_OFFSET;
+		if (rssrc == 0)
+			psel = 2; /* Key is from KS SRAM */
+		else
+			psel = 1; /* Key is from KS OTP */
+	} else {
+		psel = 3; /* Key is from parameter block */
+	}
+
+	cache_operation(TEE_CACHEFLUSH, (void *)((uint64_t)reg_map +
+				params[2].value.a), 576 * 3);
+
+	cache_operation(TEE_CACHEINVALIDATE, (void *)((uint64_t)reg_map +
+				params[2].value.b), 576 * 2);
+
+	ret = TSI_ECC_GenSignature(params[0].value.a,               /* curve_id   */
+				   1,                               /* Use the random number specified in parameter block. */
+				   psel,
+				   (ecc_ksctl & ECC_KSCTL_NUMK_MASK) >>
+				    ECC_KSCTL_NUMK_OFFSET,          /* d_knum     */
+				   reg_map_pa + params[2].value.a, /* param_addr */
+				   reg_map_pa + params[2].value.b  /* dest_addr  */
+				   );
+	if (ret != ST_SUCCESS)
+		return TEE_ERROR_CRYPTO_FAIL;
 
 	return TEE_SUCCESS;
 }
@@ -788,11 +944,29 @@ static TEE_Result invoke_command(void *pSessionContext __unused,
 		else
 			return ma35_sha_update(nParamTypes, pParams);
 
+	case PTA_CMD_CRYPTO_ECC_KEY_GEN:
+		if (tsi_en)
+			return tsi_ecc_key_gen(nParamTypes, pParams);
+		else
+			return TEE_ERROR_CRYPTO_NOT_SUPPORT;
+
 	case PTA_CMD_CRYPTO_ECC_PMUL:
 		if (tsi_en)
 			return tsi_ecc_pmul(nParamTypes, pParams);
 		else
 			return ma35_ecc_pmul(nParamTypes, pParams);
+
+	case PTA_CMD_CRYPTO_ECC_SIG_VERIFY:
+		if (tsi_en)
+			return tsi_ecc_sig_verify(nParamTypes, pParams);
+		else
+			return TEE_ERROR_CRYPTO_NOT_SUPPORT;
+
+	case PTA_CMD_CRYPTO_ECC_SIG_GEN:
+		if (tsi_en)
+			return tsi_ecc_sig_gen(nParamTypes, pParams);
+		else
+			return TEE_ERROR_CRYPTO_NOT_SUPPORT;
 
 	case PTA_CMD_CRYPTO_RSA_RUN:
 		if (tsi_en)

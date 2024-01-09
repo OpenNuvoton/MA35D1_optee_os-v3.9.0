@@ -12,6 +12,8 @@
 #define TEE_ERROR_CRYPTO_FAIL		0x00000002
 #define TEE_ERROR_CRYPTO_INVALID	0x00000003
 #define TEE_ERROR_CRYPTO_TIMEOUT	0x00000004
+#define TEE_ERROR_CRYPTO_NOT_SUPPORT	0x00000005
+#define TEE_ERROR_CRYPTO_ECC_VERIFY	0x00000011
 
 /*
  * PTA_CMD_CRYPTO_INIT - Initialize Crypto Engine
@@ -127,6 +129,23 @@
 #define PTA_CMD_CRYPTO_SHA_FINAL	10
 
 /*
+ * PTA_CMD_CRYPTO_ECC_KEY_GEN - Run ECC public key generation
+ *
+ * param[0] (in value) - value.a: ECC curve ID
+ * param[1] (inout memref) - memref.size: size of register map
+ *                           memref.buffer: register map buffer
+ * param[2] (in value) - value.a: shm offset of parameter block
+ *                     - value.b: shm offset of output buffer
+ * param[3] unused
+ *
+ * Result:
+ * TEE_SUCCESS - Invoke command success
+ * TEE_ERROR_CRYPTO_INVALID - Invalid input param
+ * TEE_ERROR_CRYPTO_FAIL - ECC operation failed
+ */
+#define PTA_CMD_CRYPTO_ECC_KEY_GEN	13
+
+/*
  * PTA_CMD_CRYPTO_ECC_PMUL - Run ECC point multiplication
  *
  * param[0] (in value) - value.a: ECC curve ID
@@ -142,6 +161,39 @@
  * TEE_ERROR_CRYPTO_FAIL - ECC operation failed
  */
 #define PTA_CMD_CRYPTO_ECC_PMUL		15
+
+/*
+ * PTA_CMD_CRYPTO_ECC_SIG_VERIFY - Run ECC ECDSA signature verification
+ *
+ * param[0] (in value) - value.a: ECC curve ID
+ * param[1] (inout memref) - memref.size: size of register map
+ *                           memref.buffer: register map buffer
+ * param[2] (in value) - value.a: shm offset of parameter block
+ * param[3] unused
+ *
+ * Result:
+ * TEE_SUCCESS - Invoke command success
+ * TEE_ERROR_CRYPTO_INVALID - Invalid input param
+ * TEE_ERROR_CRYPTO_FAIL - ECC operation failed
+ * TEE_ERROR_CRYPTO_ECC_VERIFY - ECC ECDSA signature verification failed
+ */
+#define PTA_CMD_CRYPTO_ECC_SIG_VERIFY	16
+
+/*
+ * PTA_CMD_CRYPTO_ECC_SIG_GEN - Run ECC ECDSA signature generation
+ *
+ * param[0] (in value) - value.a: ECC curve ID
+ * param[1] (inout memref) - memref.size: size of register map
+ *                           memref.buffer: register map buffer
+ * param[2] (in value) - value.a: shm offset of parameter block
+ * param[3] unused
+ *
+ * Result:
+ * TEE_SUCCESS - Invoke command success
+ * TEE_ERROR_CRYPTO_INVALID - Invalid input param
+ * TEE_ERROR_CRYPTO_FAIL - ECC operation failed
+ */
+#define PTA_CMD_CRYPTO_ECC_SIG_GEN	17
 
 /*
  * PTA_CMD_CRYPTO_RSA_RUN - Run RSA engine
