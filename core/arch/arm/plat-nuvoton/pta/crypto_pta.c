@@ -105,7 +105,7 @@ static TEE_Result tsi_aes_run(uint32_t types,
 	uint32_t  *reg_map;
 	uint32_t  reg_map_pa;    /* physical address of reg_map */
 	uint32_t  aes_ctl, aes_ksctl, sid, opmode;
-	int       keysz;
+	int       keysz, cmd_ks;
 	bool      is_gcm;
 	int       i, ret;
 
@@ -122,6 +122,15 @@ static TEE_Result tsi_aes_run(uint32_t types,
 	sid = params[0].value.a;
 	aes_ctl = reg_map[AES_CTL / 4];
 	aes_ksctl = params[0].value.b;
+
+	cmd_ks = 0;
+	if (aes_ksctl & AES_KSCTL_RSRC) {
+		if (((aes_ksctl & AES_KSCTL_RSSRC_MASK) >> AES_KSCTL_RSSRC_OFFSET) == 0)
+			cmd_ks = SEL_KEY_FROM_KS_SRAM;
+		else
+			cmd_ks = SEL_KEY_FROM_KS_OTP;
+	}
+
 	opmode = (aes_ctl & AES_CTL_OPMODE_MASK) >> AES_CTL_OPMODE_OFFSET;
 	keysz = (aes_ctl & AES_CTL_KEYSZ_MASK) >> AES_CTL_KEYSZ_OFFSET;
 
@@ -166,8 +175,7 @@ static TEE_Result tsi_aes_run(uint32_t types,
 			(aes_ctl & AES_CTL_ENCRPT) ? 1 : 0,   /* encrypt  */
 			opmode,                               /* mode     */
 			keysz,                                /* keysz    */
-			(aes_ksctl & AES_KSCTL_RSSRC_MASK) >>
-				AES_KSCTL_RSSRC_OFFSET,       /* ks       */
+			cmd_ks,                               /* ks       */
 			(aes_ksctl & AES_KSCTL_NUM_MASK) >>
 				AES_KSCTL_NUM_OFFSET          /* ksnum    */
 			);
