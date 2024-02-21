@@ -115,7 +115,7 @@ TEE_Result tee_otp_get_hw_unique_key(struct tee_hw_unique_key *hwkey)
 
 	ret = TSI_KS_Read(0x2, 0, huk_key, 4);
 	if (ret != ST_SUCCESS) {
-		 EMSG("%s - TSI_KS_Read failed! 0x%x\n", __func__, ret);
+		 EMSG("%s - OTP UID does not exist, possibly not burned. Default key will be used instead.\n", __func__);
 	}
 
 	memcpy(&hwkey->data[0], &huk_key[0], sizeof(hwkey->data));
