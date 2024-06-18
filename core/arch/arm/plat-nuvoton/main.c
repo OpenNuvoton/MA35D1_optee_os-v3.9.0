@@ -47,6 +47,8 @@ static const struct thread_handlers handlers = {
 
 static struct nuvoton_uart_data console_data;
 
+void ma35d1_otp_management(void);
+
 const struct thread_handlers *boot_get_handlers(void)
 {
 	return &handlers;
@@ -59,6 +61,104 @@ void console_init(void)
 }
 
 #if defined(PLATFORM_FLAVOR_MA35D1)
+
+void ma35d1_otp_management(void)
+{
+	uint32_t addr, val[32];
+	int i, ret;
+
+	EMSG("+-----------------------------------------+\n");
+	EMSG("|  DUMP OTP Keys                          |\n");
+	EMSG("+-----------------------------------------+\n");
+
+	/*
+	 *  Power-on Setting: 0x100~0x103
+	 */
+	ret = TSI_OTP_Read(0x100, &val[0]);
+	if (ret == 0)
+		EMSG("Power-on Setting = 0x%08x\n", val[0]);
+	else
+		EMSG("Power-on Setting read failed, %d\n", ret);
+
+	/*
+	 *  DPM Setting: 0x104~0x107
+	 */
+	ret = TSI_OTP_Read(0x104, &val[0]);
+	if (ret == 0)
+		EMSG("DPM Setting = 0x%08x\n", val[0]);
+	else
+		EMSG("DPM Setting read failed, %d\n", ret);
+
+	/*
+	 *  PLM Setting: 0x108~0x10B
+	 */
+	ret = TSI_OTP_Read(0x108, &val[0]);
+	if (ret == 0)
+		EMSG("PLM Setting = 0x%08x\n", val[0]);
+	else
+		EMSG("PLM Setting read failed, %d\n", ret);
+
+	/*
+	 *  MAC0 Address: 0x10C~0x113
+	 */
+	ret = TSI_OTP_Read(0x10C, &val[0]);
+	ret |= TSI_OTP_Read(0x110, &val[1]);
+	if (ret == 0)
+		EMSG("MAC0 address = 0x%08x, 0x%08x\n", val[0], val[1]);
+	else
+		EMSG("MAC0 address read failed, %d\n", ret);
+
+	/*
+	 *  MAC1 Address: 0x114~0x11B
+	 */
+	TSI_OTP_Read(0x114, &val[0]);
+	ret = TSI_OTP_Read(0x118, &val[1]);
+	if (ret == 0)
+		EMSG("MAC1 address = 0x%08x, 0x%08x\n", val[0], val[1]);
+	else
+		EMSG("MAC1 address read failed, %d\n", ret);
+
+	/*
+	 *  Deploy Password: 0x11C
+	 */
+	ret = TSI_OTP_Read(0x11C, &val[0]);
+	if (ret == 0)
+		EMSG("Deploy Password = 0x%08x\n", val[0]);
+	else
+		EMSG("Deploy Password read failed, %d\n", ret);
+
+	/*
+	 *  Secure Region: 0x120~0x177
+	 */
+	memset(val, 0, sizeof(val));
+	for (i = 0, addr = 0x120; addr < 0x177; addr += 4, i++) {
+		ret = TSI_OTP_Read(addr, &val[i]);
+		if (ret)
+			EMSG("Secure Region 0x%x read failed, %d\n", addr, ret);
+	}
+	EMSG("Secure Region = ");
+	for (i = 0; i < 22; i++)
+		EMSG("0x%x: %08x ", 0x120 + i * 4, val[i]);
+	EMSG("\n");
+
+	// TSI_OTP_Program(0x1C0, 0x5A5AA5A5);
+
+	/*
+	 *  Non-secure Region: 0x178~0x1CF
+	 */
+	memset(val, 0, sizeof(val));
+	for (i = 0, addr = 0x178; addr < 0x1CF; addr += 4, i++) {
+		ret = TSI_OTP_Read(addr, &val[i]);
+		if (ret)
+			EMSG("Non-secure Region 0x%x read failed, %d\n", addr, ret);
+	}
+	EMSG("Non-secure Region = ");
+	for (i = 0; i < 22; i++)
+		EMSG("0x%x: %08x ", 0x178 + i * 4, val[i]);
+	EMSG("\n");
+
+}
+
 int ma35d1_tsi_init(void)
 {
 	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
@@ -97,6 +197,9 @@ int ma35d1_tsi_init(void)
 	else
 		EMSG("Load TSI image failed!! %d\n", ret);
 #endif
+
+	// ma35d1_otp_management();
+
 	return 0;
 }
 

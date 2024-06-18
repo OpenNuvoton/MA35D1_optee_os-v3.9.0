@@ -1207,3 +1207,23 @@ int  TSI_OTP_Read(uint32_t u32Addr, uint32_t *u32Data)
 	*u32Data = req.ack[1];
 	return ret;
 }
+
+/*
+ * @brief      Program a key data to OTP
+ * @param[in]  u32Addr     The OTP address
+ * @param[out] u32Data     The data to be programmed
+ * @return   0             success
+ * @return   otherwise     Refer to ST_XXX error code.
+ */
+int  TSI_OTP_Program(uint32_t u32Addr, uint32_t u32Data)
+{
+	TSI_REQ_T  req;
+	int  ret;
+
+	memset(&req, 0, sizeof(req));
+	req.cmd[0] = (CMD_EXT_OTP_PROGRAM << 16);
+	req.cmd[1] = u32Addr;
+	req.cmd[2] = u32Data;
+	ret = tsi_send_command_and_wait(&req, CMD_TIME_OUT_2S);
+	return ret;
+}

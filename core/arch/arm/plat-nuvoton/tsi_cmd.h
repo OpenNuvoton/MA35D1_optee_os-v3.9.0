@@ -63,6 +63,7 @@
 #define CMD_KS_REMAIN_SIZE      0x0A15
 #define CMD_KS_GET_STATUS       0x0A20
 
+#define CMD_EXT_OTP_PROGRAM     0xF905
 #define CMD_EXT_OTP_READ        0xF910
 #define	CMD_EXT_RSA_EXP_MOD     0xFE51
 
@@ -244,6 +245,7 @@ int  TSI_KS_EraseAll(void);
 int  TSI_KS_GetRemainSize(uint32_t *remain_size);
 int  TSI_KS_GetStatus(uint32_t *ks_sts, uint32_t *ks_otpsts,
 		      uint32_t *ks_metadata);
+int  TSI_OTP_Program(uint32_t u32Addr, uint32_t u32Data);
 int  TSI_OTP_Read(uint32_t u32Addr, uint32_t *u32Data);
 
 #endif	/* __TSI_CMD_H__ */
