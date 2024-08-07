@@ -188,18 +188,15 @@ int ma35d1_tsi_init(void)
 				}
 			}
 		}
-	}
-
 #ifdef LOAD_TSI_PATCH
-	ret = TSI_Load_Image((uint32_t)virt_to_phys(tsi_patch_image), sizeof(tsi_patch_image));
-	if (ret == 0)
-		EMSG("Load TSI image successful.\n");
-	else
-		EMSG("Load TSI image failed!! %d\n", ret);
+		ret = TSI_Load_Image((uint32_t)virt_to_phys(tsi_patch_image), sizeof(tsi_patch_image));
+		if (ret == 0)
+			EMSG("Load TSI image successful.\n");
+		else
+			EMSG("Load TSI image failed!! %d\n", ret);
 #endif
-
-	// ma35d1_otp_management();
-
+		// ma35d1_otp_management();
+	}
 	return 0;
 }
 
