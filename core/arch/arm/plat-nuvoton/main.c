@@ -162,13 +162,17 @@ void ma35d1_otp_management(void)
 int ma35d1_tsi_init(void)
 {
 	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+	uint32_t  version_code;
 	int  ret;
+
+	ret = TSI_Get_Version(&version_code);
+	if (ret == ST_SUCCESS)
+		return 0;
 
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		/*
 		 * TSI enabled. Invoke TSI command and return here.
 		 */
-		uint32_t  version_code;
 
 		/* enable WHC1 clock */
 		io_write32(sys_base + 0x208, io_read32(sys_base + 0x208) | (1 << 5));
