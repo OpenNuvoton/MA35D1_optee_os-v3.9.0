@@ -65,6 +65,7 @@
 
 #define CMD_EXT_OTP_PROGRAM     0xF905
 #define CMD_EXT_OTP_READ        0xF910
+#define CMD_EXT_SET_SYSTICK     0xFA01
 #define	CMD_EXT_RSA_EXP_MOD     0xFE51
 
 /*------------------------------------------------------------------*/

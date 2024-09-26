@@ -267,6 +267,14 @@ int TSI_Load_Image(uint32_t base, uint32_t size)
 	ret = tsi_send_command_and_wait(&req, CMD_TIME_OUT_2S);
 	if (ret != 0)
 		return ret;
+
+	memset(&req, 0, sizeof(req));
+	req.cmd[0] = (CMD_EXT_SET_SYSTICK << 16);
+	req.cmd[1] = 180000000;
+	ret = tsi_send_command_and_wait(&req, CMD_TIME_OUT_2S);
+	if (ret != 0)
+		return ret;
+
 	return 0;
 }
 
