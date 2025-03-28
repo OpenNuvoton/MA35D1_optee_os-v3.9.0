@@ -46,6 +46,7 @@ static const struct thread_handlers handlers = {
 };
 
 static struct nuvoton_uart_data console_data;
+static int tsi_image_loaded;
 
 void ma35d1_otp_management(void);
 
@@ -56,6 +57,7 @@ const struct thread_handlers *boot_get_handlers(void)
 
 void console_init(void)
 {
+	tsi_image_loaded = 0;
 	nuvoton_uart_init(&console_data, CONSOLE_UART_BASE);
 	register_serial_console(&console_data.chip);
 }
@@ -165,10 +167,6 @@ int ma35d1_tsi_init(void)
 	uint32_t  version_code;
 	int  ret;
 
-	ret = TSI_Get_Version(&version_code);
-	if (ret == ST_SUCCESS)
-		return 0;
-
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		/*
 		 * TSI enabled. Invoke TSI command and return here.
@@ -193,11 +191,15 @@ int ma35d1_tsi_init(void)
 			}
 		}
 #ifdef LOAD_TSI_PATCH
-		ret = TSI_Load_Image((uint32_t)virt_to_phys(tsi_patch_image), sizeof(tsi_patch_image));
-		if (ret == 0)
-			EMSG("Load TSI image successful.\n");
-		else
-			EMSG("Load TSI image failed!! %d\n", ret);
+		if (!tsi_image_loaded) {
+			ret = TSI_Load_Image((uint32_t)virt_to_phys(tsi_patch_image), sizeof(tsi_patch_image));
+			if (ret == 0) {
+				EMSG("Load TSI image successful.\n");
+				tsi_image_loaded = 1;
+			} else {
+				EMSG("Load TSI image failed!! %d\n", ret);
+			}
+		}
 #endif
 		// ma35d1_otp_management();
 	}
