@@ -700,7 +700,7 @@ int TSI_SHA_Start(int sid, int inswap, int outswap, int mode_sel, int hmac,
 	TSI_REQ_T req;
 
 	memset(&req, 0, sizeof(req));
-	req.cmd[0] = (CMD_SHA_START << 16) | sid;
+	req.cmd[0] = (CMD_EXT_SHA_START << 16) | sid;
 	req.cmd[1] = (inswap << 23) | (outswap << 22) | (mode_sel << 12) |
 			(hmac << 11) | (mode << 8);
 	req.cmd[2] = keylen;
@@ -721,7 +721,7 @@ int TSI_SHA_Update(int sid, int data_cnt, uint32_t src_addr)
 	TSI_REQ_T req;
 
 	memset(&req, 0, sizeof(req));
-	req.cmd[0] = (CMD_SHA_UPDATE << 16) | sid;
+	req.cmd[0] = (CMD_EXT_SHA_UPDATE << 16) | sid;
 	req.cmd[1] = data_cnt;
 	req.cmd[2] = src_addr;
 	return tsi_send_command_and_wait(&req, CMD_TIME_OUT_2S);
@@ -743,7 +743,7 @@ int TSI_SHA_Finish(int sid, int wcnt, int data_cnt, uint32_t src_addr,
 	TSI_REQ_T req;
 
 	memset(&req, 0, sizeof(req));
-	req.cmd[0] = (CMD_SHA_FINISH << 16) | sid;
+	req.cmd[0] = (CMD_EXT_SHA_FINISH << 16) | sid;
 	req.cmd[1] = (wcnt << 24) | data_cnt;
 	req.cmd[2] = src_addr;
 	req.cmd[3] = dest_addr;

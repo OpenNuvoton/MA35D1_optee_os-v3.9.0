@@ -67,6 +67,9 @@
 #define CMD_EXT_OTP_READ        0xF910
 #define CMD_EXT_SET_SYSTICK     0xFA01
 #define	CMD_EXT_RSA_EXP_MOD     0xFE51
+#define CMD_EXT_SHA_START       0xFE71
+#define CMD_EXT_SHA_UPDATE      0xFE72
+#define CMD_EXT_SHA_FINISH      0xFE73
 
 /*------------------------------------------------------------------*/
 /*  TSI command ACK status                                          */
