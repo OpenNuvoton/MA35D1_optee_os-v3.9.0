@@ -31,6 +31,8 @@ register_phys_mem_pgdir(MEM_AREA_IO_SEC, OTP_BASE, OTP_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, CRYPTO_BASE, CRYPTO_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, TSI_BASE, TSI_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, WHC1_BASE, WHC1_REG_SIZE);
+register_phys_mem_pgdir(MEM_AREA_RAM_SEC, TSI_SRAM_BUFF_BASE, TSI_SRAM_BUFF_SIZE);
+register_phys_mem_pgdir(MEM_AREA_RAM_NSEC, 0x80000000, CFG_TZDRAM_START - 0x80000000);
 
 #ifdef LOAD_TSI_PATCH
 #include "tsi_patch.c"

@@ -104,6 +104,21 @@
 #define ST_WHC_TX_BUSY          0xd1 /* All TX channel of Wormhole are busy      */
 #define ST_CMD_ACK_TIME_OUT     0xd2 /* TSI does not ack command in time limit   */
 
+#define TSI_SRAM_BUFF_BASE      0x28000000
+#define TSI_SRAM_BUFF_SIZE      0x00025000
+#define TSI_PARAM_BUFF_BASE     0x28004000
+#define TSI_PARAM_BUFF_SIZE     0x00004000
+#define TSI_SHA_BUFF_BASE       0x28008000
+#define TSI_SHA_BUFF_SIZE       0x00008000
+#define TSI_SHA_DGST_BASE       0x28010000
+#define TSI_SHA_DGST_SIZE       0x00000400
+#define TSI_AES_BUFF_BASE       0x28018000
+#define TSI_AES_BUFF_SIZE       0x00008000
+#define TSI_AES_PARAM_BASE      0x28020000
+#define TSI_AES_PARAM_SIZE      0x00002000
+#define TSI_CMD_BUFF_BASE       0x28023000
+#define TSI_CMD_BUFF_SIZE       0x00002000
+
 typedef struct tsi_cmd_t {
 	uint32_t	cmd[4];
 	uint32_t	ack[4];

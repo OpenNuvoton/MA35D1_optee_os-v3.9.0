@@ -121,6 +121,24 @@
 #define TCMD_RUN_KAT		0x8       /* Run KAT on DRBG or entropy source */
 #define TCMD_ZEROIZE		0xf       /* Zeroize                    */
 
+static uint32_t nonce[64] = { 0xc47b0294, 0xdbbbee0f, 0xec4757f2, 0x2ffeee35,
+			      0x87ca4730, 0xc3d33b69, 0x1df38bab, 0x63ac0a6b,
+			      0xd38da3ab, 0x584a50ea, 0xb93f2603, 0x09a5c691,
+			      0x09a5c691, 0x024f91ac, 0x6063ce20, 0x229160d9,
+			      0x49e00388, 0x1ab6b0cd, 0xe657cb40, 0x87c5aa81,
+			      0xd611eab8, 0xa7ae6d1c, 0x3a181a28, 0x9391bbec,
+			      0x22186179, 0xb6476813, 0x67e64213, 0x47cc0c01,
+			      0xf53bc314, 0x73545902, 0xd8a14864, 0xb31262d1,
+			      0x2bf77bc3, 0xd81c9e3a, 0xa0657c50, 0x51a2fe50,
+			      0x91ff8818, 0x6de4dc00, 0xba468631, 0x7601971c,
+			      0xdec69b2f, 0x336e9662, 0xef73d94a, 0x618226a3,
+			      0x3cdd3154, 0xf361b408, 0x55d394b4, 0xfc3d7775,
+			      0x8b35e0ef, 0xa221fe17, 0x0d498127, 0x641719f1,
+			      0x4e5197b1, 0x7c84d929, 0xab60aa80, 0x08889570,
+			      0xee42614d, 0x73c2ace4, 0xbaed0e9c, 0x9a12145d,
+			      0xed66a951, 0xeac1e50f, 0x690c563b, 0x5dccdc9d
+			    };
+
 static int ma35_trng_wait_busy_clear(vaddr_t trng_base)
 {
 	TEE_Time  t_start, t_cur;
@@ -163,7 +181,7 @@ static int ma35_trng_issue_command(vaddr_t trng_base, int cmd)
 	return 0;
 }
 
-static int ma35_trng_gen_nonce(vaddr_t trng_base, uint32_t *nonce)
+static int ma35_trng_gen_nonce(vaddr_t trng_base, uint32_t *nonce_data)
 {
 	int   i, j, loop, ret;
 
@@ -179,7 +197,7 @@ static int ma35_trng_gen_nonce(vaddr_t trng_base, uint32_t *nonce)
 			return TEE_ERROR_TRNG_BUSY;
 
 		for (j = 0; j < 16; j++)
-			io_write32(NPA_DATA(j), nonce[j]);
+			io_write32(NPA_DATA(j), nonce_data[j]);
 
 		ret = ma35_trng_issue_command(trng_base, TCMD_GEN_NONCE);
 		if (ret != 0)
@@ -198,25 +216,12 @@ static int ma35_trng_create_state(vaddr_t trng_base)
 
 static TEE_Result ma35_trng_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	uint32_t nonce[64] = { 0xc47b0294, 0xdbbbee0f, 0xec4757f2, 0x2ffeee35,
-			       0x87ca4730, 0xc3d33b69, 0x1df38bab, 0x63ac0a6b,
-			       0xd38da3ab, 0x584a50ea, 0xb93f2603, 0x09a5c691,
-			       0x09a5c691, 0x024f91ac, 0x6063ce20, 0x229160d9,
-			       0x49e00388, 0x1ab6b0cd, 0xe657cb40, 0x87c5aa81,
-			       0xd611eab8, 0xa7ae6d1c, 0x3a181a28, 0x9391bbec,
-			       0x22186179, 0xb6476813, 0x67e64213, 0x47cc0c01,
-			       0xf53bc314, 0x73545902, 0xd8a14864, 0xb31262d1,
-			       0x2bf77bc3, 0xd81c9e3a, 0xa0657c50, 0x51a2fe50,
-			       0x91ff8818, 0x6de4dc00, 0xba468631, 0x7601971c,
-			       0xdec69b2f, 0x336e9662, 0xef73d94a, 0x618226a3,
-			       0x3cdd3154, 0xf361b408, 0x55d394b4, 0xfc3d7775,
-			       0x8b35e0ef, 0xa221fe17, 0x0d498127, 0x641719f1,
-			       0x4e5197b1, 0x7c84d929, 0xab60aa80, 0x08889570,
-			       0xee42614d, 0x73c2ace4, 0xbaed0e9c, 0x9a12145d,
-			       0xed66a951, 0xeac1e50f, 0x690c563b, 0x5dccdc9d
-			       };
 	vaddr_t trng_base = core_mmu_get_va(TRNG_BASE, MEM_AREA_IO_SEC);
 	vaddr_t tsi_base = core_mmu_get_va(TSI_BASE, MEM_AREA_IO_SEC);
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+	paddr_t nonce_pa;
+#endif
 	int ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_OUTPUT,
@@ -226,19 +231,23 @@ static TEE_Result ma35_trng_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS
 		return TEE_ERROR_BAD_PARAMETERS;
 
 #if defined(PLATFORM_FLAVOR_MA35D1)
-	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
-
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 
 		ret = ma35d1_tsi_init();
 		if (ret != 0)
 			return ret;
 
-		ret = TSI_TRNG_Init(0, 0); //(uint32_t)((uint64_t)nonce));
+		nonce_pa = virt_to_phys(nonce);
+		if (!nonce_pa) {
+			EMSG("Failed to get physical address of nonce!");
+			return TEE_ERROR_GENERIC;
+		}
+
+		ret = TSI_TRNG_Init(1, nonce_pa);
 		if (ret == ST_WAIT_TSI_SYNC) {
 			if (TSI_Sync() != ST_SUCCESS)
 				return TEE_ERROR_TRNG_BUSY;
-			ret = TSI_TRNG_Init(0, 0); // (uint32_t)((uint64_t)nonce));
+			ret = TSI_TRNG_Init(1, nonce_pa);
 		}
 		if (ret != ST_SUCCESS)
 			return TEE_ERROR_TRNG_GEN_NOISE;
@@ -283,6 +292,10 @@ static TEE_Result ma35_trng_read(uint32_t types, TEE_Param params[TEE_NUM_PARAMS
 	uint32_t *rdata = NULL;
 	uint32_t rq_size = 0, get_size = 0;
 	vaddr_t trng_base = core_mmu_get_va(TRNG_BASE, MEM_AREA_IO_SEC);
+#if defined(PLATFORM_FLAVOR_MA35D1)
+	vaddr_t va = core_mmu_get_va(TSI_CMD_BUFF_BASE, MEM_AREA_RAM_SEC);
+	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
+#endif
 	int	i, ret;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
@@ -301,22 +314,19 @@ static TEE_Result ma35_trng_read(uint32_t types, TEE_Param params[TEE_NUM_PARAMS
 		return TEE_ERROR_BAD_PARAMETERS;
 
 #if defined(PLATFORM_FLAVOR_MA35D1)
-	vaddr_t sys_base = core_mmu_get_va(SYS_BASE, MEM_AREA_IO_SEC);
-
 	if (!(io_read32(sys_base + SYS_CHIPCFG) & TSIEN)) {
 		/*
 		 * TSI enabled. Invoke TSI command and return here.
 		 */
-		cache_operation(TEE_CACHEINVALIDATE, rdata, rq_size);
-
-		ret = TSI_TRNG_Gen_Random(rq_size / 4, (uint32_t)virt_to_phys(rdata));
+		cache_operation(TEE_CACHEINVALIDATE, (void *)va, rq_size);
+		ret = TSI_TRNG_Gen_Random(rq_size / 4, TSI_CMD_BUFF_BASE);
+		memcpy(rdata, (void *)va, rq_size);
 		if (ret != ST_SUCCESS)
 			return TEE_ERROR_TRNG_FAILED;
 
 		return 0;
 	}
 #endif
-
 	while (rq_size >= 4) {
 		if (ma35_trng_wait_busy_clear(trng_base) != 0)
 			return TEE_ERROR_TRNG_BUSY;
@@ -335,7 +345,6 @@ static TEE_Result ma35_trng_read(uint32_t types, TEE_Param params[TEE_NUM_PARAMS
 		}
 	}
 	params[0].memref.size = get_size;
-	FMSG("reqsize = %d, get_size=%d\n", rq_size, get_size);
 	return 0;
 }
 
@@ -343,8 +352,6 @@ static TEE_Result invoke_command(void *pSessionContext __unused,
 				 uint32_t nCommandID, uint32_t nParamTypes,
 				 TEE_Param pParams[TEE_NUM_PARAMS])
 {
-	FMSG("command entry point for pseudo-TA \"%s\"", PTA_NAME);
-
 	switch (nCommandID) {
 	case PTA_CMD_TRNG_INIT:
 		return ma35_trng_init(nParamTypes, pParams);
